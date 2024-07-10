@@ -62,4 +62,7 @@ arguments   -> expression ( "," expression )* ;
 
 primary     -> NUMBER | STRING | IDENTIFIER
              | "true" | "false" | "nil"
+             | lambda
              | "(" expression ")" ;
+
+lambda      -> "fun" "(" parameters? ")" statement

@@ -1,6 +1,6 @@
 use crate::object::Object;
-use crate::stmt::Function;
 use crate::token::Token;
+use crate::stmt;
 
 use std::result::Result;
 
@@ -13,6 +13,7 @@ pub trait Visitor<T, E> {
     fn unary(&mut self, expr: &Unary) -> Result<T, E>;
     fn var(&mut self, expr: &Var) -> Result<T, E>;
     fn logical(&mut self, expr: &Logical) -> Result<T, E>;
+    fn lambda(&mut self, expr: &Lambda) -> Result<T, E>;
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +26,7 @@ pub enum Expr {
     Var(Var),
     Grouping(Grouping),
     Logical(Logical),
-    // LambdaFunc(Lambda),
+    Lambda(Lambda),
 }
 
 impl Expr {
@@ -39,6 +40,7 @@ impl Expr {
             Expr::Unary(u) => u.accept(visitor),
             Expr::Var(v) => v.accept(visitor),
             Expr::Logical(l) => l.accept(visitor),
+            Expr::Lambda(l) => l.accept(visitor),
         }
     }
 }
@@ -79,12 +81,13 @@ impl Binary {
 #[derive(Debug, Clone)]
 pub struct Call {
     pub callee: Box<Expr>,
+    pub paren: Token,
     pub args: Vec<Expr>,
 }
 
 impl Call {
-    pub fn new(callee: Box<Expr>, args: Vec<Expr>) -> Self {
-        Self { callee, args }
+    pub fn new(callee: Box<Expr>, paren: Token, args: Vec<Expr>) -> Self {
+        Self { callee, paren, args }
     }
 
     fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
@@ -167,5 +170,21 @@ impl Logical {
 
     fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
         visitor.logical(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Lambda {
+    pub params: Vec<Token>,
+    pub body: Vec<stmt::Stmt>,
+}
+
+impl Lambda {
+    pub fn new(params: Vec<Token>, body: Vec<stmt::Stmt>) -> Self {
+        Self { params, body }
+    }
+
+    fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
+        visitor.lambda(self)
     }
 }

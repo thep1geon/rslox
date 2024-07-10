@@ -10,6 +10,7 @@ pub trait Visitor<T, E> {
     fn block(&mut self, stmt: &Block) -> Result<T, E>;
     fn function(&mut self, stmt: &Function) -> Result<T, E>;
     fn return_stmt(&mut self, stmt: &Return) -> Result<T, E>;
+    fn break_stmt(&mut self, stmt: &Break) -> Result<T, E>;
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +23,7 @@ pub enum Stmt {
     Block(Block),
     Function(Function),
     Return(Return),
+    Break(Break),
 }
 
 impl Stmt {
@@ -35,6 +37,7 @@ impl Stmt {
             Self::Block(b) => b.accept(visitor),
             Self::Function(f) => f.accept(visitor),
             Self::Return(r) => r.accept(visitor),
+            Self::Break(b) => b.accept(visitor),
         }
     }
 }
@@ -174,5 +177,18 @@ impl Return {
 
     pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
         visitor.return_stmt(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Break;
+
+impl Break {
+    pub fn new() -> Self {
+        Self { }
+    }
+
+    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
+        visitor.break_stmt(self)
     }
 }

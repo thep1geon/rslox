@@ -8,6 +8,7 @@ mod object;
 mod parser;
 mod stmt;
 mod token;
+mod token_kind;
 
 use core::panic;
 use std::env::args;
@@ -62,7 +63,7 @@ fn run_file(fpath: &str) {
     // Kinda looks weird
     match run(&str, &mut interpreter) {
         Ok(()) => (),
-        Err(e) => eprintln!("{e:?}"),
+        Err(e) => eprintln!("{e}"),
     }
 }
 
@@ -83,7 +84,7 @@ fn run_prompt() {
 
         match run(line.as_str(), &mut interpreter) {
             Ok(()) => (),
-            Err(e) => eprintln!("{e:?}"),
+            Err(e) => eprintln!("{e}"),
         }
     }
 }

@@ -1,13 +1,15 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::callable::{Callable, UserFunction};
+use crate::callable::{Callable, LambdaFunction, UserFunction};
 use crate::expr::{self, Expr};
 use crate::object::Object;
 use crate::stmt::{self, Stmt};
 use crate::token::Token;
+use crate::token_kind::TokenKind;
 
 #[derive(Clone, Debug)]
 pub struct Env {
@@ -26,12 +28,65 @@ pub struct Interpreter {
     envs: Vec<Rc<Env>>,
 }
 
-#[derive(Debug)]
-pub enum Error {
-    UndefindeVariable,
+pub enum ErrorKind {
+    UndefinedVariable,
     InvalidType,
     IncorrectArgCount,
+
     Return(Object),
+    Break,
+}
+
+pub struct Error {
+    pub kind: ErrorKind,
+    pub line: usize,
+}
+
+impl Error {
+    pub fn undefined_variable(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::UndefinedVariable,
+            line,
+        }
+    }
+
+    pub fn invalid_type(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::InvalidType,
+            line,
+        }
+    }
+
+    pub fn incorrect_arg_count(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::IncorrectArgCount,
+            line,
+        }
+    }
+    pub fn _return(obj: Object) -> Self {
+        Self {
+            kind: ErrorKind::Return(obj),
+            line: 0,
+        }
+    }
+    pub fn _break() -> Self {
+        Self {
+            kind: ErrorKind::Break,
+            line: 0,
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            ErrorKind::Return(_) => write!(f, "Return"),
+            ErrorKind::Break => write!(f, "Break"),
+            ErrorKind::IncorrectArgCount => write!(f, "IncorrectArgCount"),
+            ErrorKind::InvalidType => write!(f, "InvalidType"),
+            ErrorKind::UndefinedVariable => write!(f, "UndefinedVariable"),
+        }
+    }
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -92,7 +147,7 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Result<()> {
+    pub fn execute(&mut self, stmt: &Stmt) -> Result<()> {
         stmt.accept(self)
     }
 
@@ -100,10 +155,10 @@ impl Interpreter {
         expr.accept(self)
     }
 
-    fn check_operands(&self, objs: &[&Object]) -> Result<()> {
+    fn check_operands(&self, objs: &[&Object], op: &Token) -> Result<()> {
         for obj in objs {
             if !matches!(obj, Object::Number(_)) {
-                return Err(Error::InvalidType);
+                return Err(Error::invalid_type(op.line));
             }
         }
 
@@ -166,12 +221,12 @@ impl expr::Visitor<Object, Error> for Interpreter {
     fn unary(&mut self, expr: &expr::Unary) -> Result<Object> {
         let right = self.eval(&expr.expr)?;
 
-        match expr.op {
-            Token::Minus => match self.check_operands(&[&right]) {
+        match expr.op.kind {
+            TokenKind::Minus => match self.check_operands(&[&right], &expr.op) {
                 Ok(()) => Ok(Object::Number(-right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::Bang => Ok(Object::Bool(!right.is_truthy())),
+            TokenKind::Bang => Ok(Object::Bool(!right.is_truthy())),
 
             _ => unreachable!(),
         }
@@ -181,49 +236,49 @@ impl expr::Visitor<Object, Error> for Interpreter {
         let left = self.eval(&expr.left)?;
         let right = self.eval(&expr.right)?;
 
-        match expr.op {
-            Token::Minus => match self.check_operands(&[&left, &right]) {
+        match expr.op.kind {
+            TokenKind::Minus => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Number(left.get_number() - right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::Plus => {
+            TokenKind::Plus => {
                 use Object::{Number, Str};
                 match (left, right) {
                     (Number(l), Number(r)) => Ok(Object::Number(l + r)),
                     (Str(l), Str(r)) => Ok(Object::Str(l.to_owned() + &r)),
                     (Number(l), Str(r)) => Ok(Object::Str(format!("{l}{r}").to_string())),
                     (Str(l), Number(r)) => Ok(Object::Str(format!("{l}{r}").to_string())),
-                    (_, _) => Err(Error::InvalidType),
+                    (_, _) => Err(Error::invalid_type(expr.op.line)),
                 }
             }
-            Token::Slash => match self.check_operands(&[&left, &right]) {
+            TokenKind::Slash => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Number(left.get_number() / right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::Star => match self.check_operands(&[&left, &right]) {
+            TokenKind::Star => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Number(left.get_number() * right.get_number())),
                 Err(e) => Err(e),
             },
 
-            Token::Gt => match self.check_operands(&[&left, &right]) {
+            TokenKind::Gt => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Bool(left.get_number() > right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::GtEq => match self.check_operands(&[&left, &right]) {
+            TokenKind::GtEq => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Bool(left.get_number() >= right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::Lt => match self.check_operands(&[&left, &right]) {
+            TokenKind::Lt => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Bool(left.get_number() < right.get_number())),
                 Err(e) => Err(e),
             },
-            Token::LtEq => match self.check_operands(&[&left, &right]) {
+            TokenKind::LtEq => match self.check_operands(&[&left, &right], &expr.op) {
                 Ok(()) => Ok(Object::Bool(left.get_number() <= right.get_number())),
                 Err(e) => Err(e),
             },
 
-            Token::BangEq => Ok(Object::Bool(left.equals(&right))),
-            Token::EqEq => Ok(Object::Bool(left.equals(&right))),
+            TokenKind::BangEq => Ok(Object::Bool(left.equals(&right))),
+            TokenKind::EqEq => Ok(Object::Bool(left.equals(&right))),
 
             _ => unreachable!(),
         }
@@ -238,24 +293,24 @@ impl expr::Visitor<Object, Error> for Interpreter {
     }
 
     fn var(&mut self, expr: &expr::Var) -> std::result::Result<Object, Error> {
-        match self.fetch(&expr.name.as_string()) {
+        match self.fetch(&expr.name.kind.as_string()) {
             Some(obj) => Ok(obj.clone()),
-            None => Err(Error::UndefindeVariable),
+            None => Err(Error::undefined_variable(expr.name.line)),
         }
     }
 
     fn assignment(&mut self, expr: &expr::Assignment) -> std::result::Result<Object, Error> {
         let value = self.eval(&expr.value)?;
-        match self.assign(&expr.name.as_string(), value.clone()) {
+        match self.assign(&expr.name.kind.as_string(), value.clone()) {
             Some(()) => Ok(value),
-            None => Err(Error::UndefindeVariable),
+            None => Err(Error::undefined_variable(expr.name.line)),
         }
     }
 
     fn logical(&mut self, expr: &expr::Logical) -> std::result::Result<Object, Error> {
         let left = self.eval(&expr.left)?;
 
-        if matches!(expr.op, Token::Or) && left.is_truthy() {
+        if matches!(expr.op.kind, TokenKind::Or) && left.is_truthy() {
             return Ok(left);
         }
 
@@ -275,16 +330,21 @@ impl expr::Visitor<Object, Error> for Interpreter {
         }
 
         if !matches!(callee, Object::Func(_)) {
-            return Err(Error::InvalidType);
+            return Err(Error::invalid_type(expr.paren.line));
         }
 
         let func: &mut Callable = callee.get_func();
 
         if func.arity() as usize != args.len() {
-            return Err(Error::IncorrectArgCount);
+            return Err(Error::incorrect_arg_count(expr.paren.line));
         }
 
         func.call(self, args)
+    }
+
+    fn lambda(&mut self, expr: &expr::Lambda) -> std::result::Result<Object, Error> {
+        let lambda = Callable::LambdaFn(LambdaFunction::new(expr.clone(), self.env()));
+        Ok(Object::Func(lambda))
     }
 }
 
@@ -302,7 +362,7 @@ impl stmt::Visitor<(), Error> for Interpreter {
 
     fn vardecl(&mut self, stmt: &stmt::VarDecl) -> std::result::Result<(), Error> {
         let value = self.eval(&stmt.initializer)?;
-        self.define(stmt.name.as_string(), value);
+        self.define(stmt.name.kind.as_string(), value);
         Ok(())
     }
 
@@ -329,7 +389,13 @@ impl stmt::Visitor<(), Error> for Interpreter {
 
     fn while_stmt(&mut self, stmt: &stmt::While) -> std::result::Result<(), Error> {
         while self.eval(&stmt.condition)?.is_truthy() {
-            self.execute(&stmt.statement)?;
+            match self.execute(&stmt.statement) {
+                Ok(()) => {},
+                Err(e) => match &e.kind {
+                    ErrorKind::Break => break,
+                    _ => return Err(e),
+                }
+            }
         }
 
         Ok(())
@@ -342,9 +408,13 @@ impl stmt::Visitor<(), Error> for Interpreter {
     }
 
     fn return_stmt(&mut self, stmt: &stmt::Return) -> std::result::Result<(), Error> {
-        Err(Error::Return(match &stmt.value {
+        Err(Error::_return(match &stmt.value {
             Some(val) => self.eval(val)?,
             None => Object::Nil,
         }))
+    }
+
+    fn break_stmt(&mut self, _stmt: &stmt::Break) -> std::result::Result<(), Error> {
+        Err(Error::_break())
     }
 }

@@ -1,12 +1,59 @@
 use crate::token::Token;
+use crate::token_kind::TokenKind::*;
+use std::fmt;
 use std::collections::HashMap;
 
-#[derive(Debug)]
-pub enum Error {
+pub enum ErrorKind {
     ByteToStringConversion,
     NumberParsing,
     UnknownCharacter,
     UnterminatedString,
+}
+
+pub struct Error {
+    pub kind: ErrorKind,
+    pub line: usize,
+}
+
+impl Error {
+    pub fn byte_to_string_conversion(line: usize) -> Self {
+        Self { 
+            kind: ErrorKind::ByteToStringConversion, 
+            line, 
+        }
+    }
+
+    pub fn number_parsing(line: usize) -> Self {
+        Self { 
+            kind: ErrorKind::NumberParsing, 
+            line, 
+        }
+    }
+
+    pub fn unknown_character(line: usize) -> Self {
+        Self { 
+            kind: ErrorKind::UnknownCharacter, 
+            line, 
+        }
+    }
+
+    pub fn unterminated_string(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::UnterminatedString,
+            line,
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            ErrorKind::ByteToStringConversion => write!(f, "ByteToStringConversion"),
+            ErrorKind::NumberParsing => write!(f, "NumberParsing"),
+            ErrorKind::UnknownCharacter => write!(f, "UnknownCharacter"),
+            ErrorKind::UnterminatedString => write!(f, "UnterminatedString"),
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -44,22 +91,23 @@ impl<'a> Lexer<'a> {
     }
 
     fn init_keywords(&mut self) {
-        self.keywords.insert("and".to_string(), Token::And);
-        self.keywords.insert("class".to_string(), Token::Class);
-        self.keywords.insert("else".to_string(), Token::Else);
-        self.keywords.insert("false".to_string(), Token::False);
-        self.keywords.insert("for".to_string(), Token::For);
-        self.keywords.insert("fun".to_string(), Token::Fun);
-        self.keywords.insert("if".to_string(), Token::If);
-        self.keywords.insert("nil".to_string(), Token::Nil);
-        self.keywords.insert("or".to_string(), Token::Or);
-        self.keywords.insert("print".to_string(), Token::Print);
-        self.keywords.insert("return".to_string(), Token::Return);
-        self.keywords.insert("super".to_string(), Token::Super);
-        self.keywords.insert("this".to_string(), Token::This);
-        self.keywords.insert("true".to_string(), Token::True);
-        self.keywords.insert("var".to_string(), Token::Var);
-        self.keywords.insert("while".to_string(), Token::While);
+        self.keywords.insert("and".to_string(), Token::new(And, 0));
+        self.keywords.insert("break".to_string(), Token::new(Break, 0));
+        self.keywords.insert("class".to_string(), Token::new(Class, 0));
+        self.keywords.insert("else".to_string(), Token::new(Else, 0));
+        self.keywords.insert("false".to_string(), Token::new(False, 0));
+        self.keywords.insert("for".to_string(), Token::new(For, 0));
+        self.keywords.insert("fun".to_string(), Token::new(Fun, 0));
+        self.keywords.insert("if".to_string(), Token::new(If, 0));
+        self.keywords.insert("nil".to_string(), Token::new(Nil, 0));
+        self.keywords.insert("or".to_string(), Token::new(Or, 0));
+        self.keywords.insert("print".to_string(), Token::new(Print, 0));
+        self.keywords.insert("return".to_string(), Token::new(Return, 0));
+        self.keywords.insert("super".to_string(), Token::new(Super, 0));
+        self.keywords.insert("this".to_string(), Token::new(This, 0));
+        self.keywords.insert("true".to_string(), Token::new(True, 0));
+        self.keywords.insert("var".to_string(), Token::new(Var, 0));
+        self.keywords.insert("while".to_string(), Token::new(While, 0));
     }
 
     fn peek(&self) -> char {
@@ -113,54 +161,54 @@ impl<'a> Lexer<'a> {
         match c as u8 {
             b' ' | b'\r' | b'\t' => (),
             b'\n' => self.line += 1,
-            b'(' => self.add(Token::LParen),
-            b')' => self.add(Token::RParen),
-            b'{' => self.add(Token::LBrace),
-            b'}' => self.add(Token::RBrace),
-            b',' => self.add(Token::Comma),
-            b'.' => self.add(Token::Dot),
-            b'-' => self.add(Token::Minus),
-            b'+' => self.add(Token::Plus),
+            b'(' => self.add(Token::new(LParen, self.line)),
+            b')' => self.add(Token::new(RParen, self.line)),
+            b'{' => self.add(Token::new(LBrace, self.line)),
+            b'}' => self.add(Token::new(RBrace, self.line)),
+            b',' => self.add(Token::new(Comma, self.line)),
+            b'.' => self.add(Token::new(Dot, self.line)),
+            b'-' => self.add(Token::new(Minus, self.line)),
+            b'+' => self.add(Token::new(Plus, self.line)),
 
             b'/' => {
                 if self.expect('/') {
                     self.consume_comment();
                 } else {
-                    self.add(Token::Slash);
+                    self.add(Token::new(Slash, self.line));
                 }
             }
-            b';' => self.add(Token::Semicolon),
-            b'*' => self.add(Token::Star),
+            b';' => self.add(Token::new(Semicolon, self.line)),
+            b'*' => self.add(Token::new(Star, self.line)),
 
             b'!' => {
                 if self.expect('=') {
-                    self.add(Token::BangEq);
+                    self.add(Token::new(BangEq, self.line));
                 } else {
-                    self.add(Token::Bang);
+                    self.add(Token::new(Bang, self.line));
                 }
             }
 
             b'=' => {
                 if self.expect('=') {
-                    self.add(Token::EqEq);
+                    self.add(Token::new(EqEq, self.line));
                 } else {
-                    self.add(Token::Eq);
+                    self.add(Token::new(Eq, self.line));
                 }
             }
 
             b'<' => {
                 if self.expect('=') {
-                    self.add(Token::LtEq);
+                    self.add(Token::new(LtEq, self.line));
                 } else {
-                    self.add(Token::Lt);
+                    self.add(Token::new(Lt, self.line));
                 }
             }
 
             b'>' => {
                 if self.expect('=') {
-                    self.add(Token::GtEq);
+                    self.add(Token::new(GtEq, self.line));
                 } else {
-                    self.add(Token::Gt);
+                    self.add(Token::new(Gt, self.line));
                 }
             }
 
@@ -170,7 +218,7 @@ impl<'a> Lexer<'a> {
 
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.scan_ident()?,
 
-            _ => return Err(Error::UnknownCharacter),
+            _ => return Err(Error::unknown_character(self.line)),
         }
 
         Ok(())
@@ -186,7 +234,7 @@ impl<'a> Lexer<'a> {
         }
 
         if !self.bound() {
-            return Err(Error::UnterminatedString);
+            return Err(Error::unterminated_string(self.line));
         }
 
         self.advance();
@@ -195,11 +243,11 @@ impl<'a> Lexer<'a> {
 
         let str = match std::str::from_utf8(bytes) {
             Ok(s) => s,
-            Err(_) => return Err(Error::ByteToStringConversion),
+            Err(_) => return Err(Error::byte_to_string_conversion(self.line)),
         }
         .to_string();
 
-        self.add(Token::String(str));
+        self.add(Token::new(Str(str), self.line));
 
         Ok(())
     }
@@ -221,14 +269,17 @@ impl<'a> Lexer<'a> {
 
         let str = match std::str::from_utf8(bytes) {
             Ok(s) => s,
-            Err(_) => return Err(Error::ByteToStringConversion),
+            Err(_) => return Err(Error::byte_to_string_conversion(self.line)),
         }
         .to_string();
 
-        self.add(Token::Number(match str.parse::<f64>() {
-            Ok(num) => num,
-            Err(_) => return Err(Error::NumberParsing),
-        }));
+        self.add(Token::new(
+            Number(match str.parse::<f64>() {
+                Ok(num) => num,
+                Err(_) => return Err(Error::number_parsing(self.line)),
+            }),
+            self.line,
+        ));
 
         Ok(())
     }
@@ -242,22 +293,18 @@ impl<'a> Lexer<'a> {
 
         let str = match std::str::from_utf8(bytes) {
             Ok(s) => s,
-            Err(_) => return Err(Error::ByteToStringConversion),
+            Err(_) => return Err(Error::byte_to_string_conversion(self.line)),
         }
         .to_string();
 
         match self.keywords.get(&str) {
             Some(tok) => self.add(tok.clone()),
-            None => self.add(Token::Ident(str)),
+            None => self.add(Token::new(Ident(str), self.line)),
         }
 
         Ok(())
     }
 
-    /// # Errors
-    ///
-    /// This function would return an error if anything major went wrong
-    /// with lexing the string
     pub fn scan_tokens(&mut self) -> Result<&Vec<Token>> {
         self.init_keywords();
         while self.bound() {
@@ -265,7 +312,7 @@ impl<'a> Lexer<'a> {
             self.scan_token()?;
         }
 
-        self.tokens.push(Token::Eof);
+        self.tokens.push(Token::new(Eof, self.line));
         Ok(&self.tokens)
     }
 }
