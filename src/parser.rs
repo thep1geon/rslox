@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 
 use crate::expr::{Assignment, Binary, Call, Expr, Grouping, Lambda, Literal, Logical, Unary, Var};
 use crate::object::Object;
@@ -217,7 +218,7 @@ impl Parser {
 
         let name = self.advance().clone();
 
-        let mut init = Expr::Literal(Literal::new(Object::Nil));
+        let mut init = Rc::new(Expr::Literal(Literal::new(Object::Nil)));
 
         if self.matches(&[TokenKind::Eq]) {
             init = self.expression()?;
@@ -249,10 +250,11 @@ impl Parser {
     fn return_statement(&mut self) -> Result<Stmt> {
         let keyword = self.advance().clone();
 
-        let mut value: Option<Expr> = None;
-        if !self.check(&TokenKind::Semicolon) {
-            value = Some(self.expression()?);
-        }
+        let value = if self.check(&TokenKind::Semicolon) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
 
         self.expect(&TokenKind::Semicolon)?;
 
@@ -273,17 +275,19 @@ impl Parser {
             initializer = Some(self.expression_statement()?);
         }
 
-        let mut condition: Option<Expr> = None;
-        if !self.check(&TokenKind::Semicolon) {
-            condition = Some(self.expression()?);
-        }
+        let mut condition: Option<Rc<Expr>> = if self.check(&TokenKind::RParen) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
 
         self.expect(&TokenKind::Semicolon)?;
 
-        let mut increment: Option<Expr> = None;
-        if !self.check(&TokenKind::RParen) {
-            increment = Some(self.expression()?);
-        }
+        let increment: Option<Rc<Expr>> = if self.check(&TokenKind::RParen) {
+            None
+        } else {
+            Some(self.expression()?)
+        };
 
         self.expect(&TokenKind::RParen)?;
 
@@ -294,10 +298,10 @@ impl Parser {
         }
 
         if condition.is_none() {
-            condition = Some(Expr::Literal(Literal::new(Object::Bool(true))));
+            condition = Some(Rc::new(Expr::Literal(Literal::new(Object::Bool(true)))));
         }
 
-        body = Stmt::While(While::new(condition.unwrap(), Box::new(body)));
+        body = Stmt::While(While::new(condition.unwrap(), Rc::new(body)));
 
         if let Some(init) = initializer {
             body = Stmt::Block(Block::new(vec![init, body]));
@@ -314,7 +318,7 @@ impl Parser {
 
         let stmt = self.statement()?;
 
-        Ok(Stmt::While(While::new(expr, Box::new(stmt))))
+        Ok(Stmt::While(While::new(expr, Rc::new(stmt))))
     }
 
     fn if_statement(&mut self) -> Result<Stmt> {
@@ -323,13 +327,15 @@ impl Parser {
         let expr = self.expression()?;
         self.expect(&TokenKind::RParen)?;
 
-        let then_branch = Box::new(self.statement()?);
-        let mut else_branch: Option<Box<Stmt>> = None;
-        if self.matches(&[TokenKind::Else]) {
-            else_branch = Some(Box::new(self.statement()?));
-        }
+        let then = Rc::new(self.statement()?);
 
-        Ok(Stmt::If(If::new(expr, then_branch, else_branch)))
+        let else_ = if self.matches(&[TokenKind::Else]) {
+            Some(Rc::new(self.statement()?))
+        } else {
+            None
+        };
+
+        Ok(Stmt::If(If::new(expr, then, else_)))
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>> {
@@ -358,23 +364,23 @@ impl Parser {
         Ok(Stmt::Expr(Expression::new(val)))
     }
 
-    fn expression(&mut self) -> Result<Expr> {
+    fn expression(&mut self) -> Result<Rc<Expr>> {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> Result<Expr> {
+    fn assignment(&mut self) -> Result<Rc<Expr>> {
         let expr = self.logical_or()?;
 
         if self.matches(&[TokenKind::Eq]) {
             let value = self.assignment()?;
 
-            if matches!(expr, Expr::Var(_)) {
-                let name = match &expr {
+            if matches!(expr.as_ref(), Expr::Var(_)) {
+                let name = match &expr.as_ref() {
                     Expr::Var(v) => v.name.clone(),
                     _ => unreachable!(),
                 };
 
-                return Ok(Expr::Assignment(Assignment::new(name, Box::new(value))));
+                return Ok(Rc::new(Expr::Assignment(Assignment::new(name, Rc::clone(&value)))));
             }
 
             self.error("Invalid assignment target");
@@ -383,89 +389,89 @@ impl Parser {
         Ok(expr)
     }
 
-    fn logical_or(&mut self) -> Result<Expr> {
+    fn logical_or(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.logical_and()?;
 
         while self.matches(&[TokenKind::Or]) {
             let op = self.prev().unwrap().clone();
             let right = self.logical_and()?;
-            expr = Expr::Logical(Logical::new(Box::new(expr), op, Box::new(right)));
+            expr = Rc::new(Expr::Logical(Logical::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn logical_and(&mut self) -> Result<Expr> {
+    fn logical_and(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.equality()?;
 
         while self.matches(&[TokenKind::And]) {
             let op = self.prev().unwrap().clone();
             let right = self.logical_and()?;
-            expr = Expr::Logical(Logical::new(Box::new(expr), op, Box::new(right)));
+            expr = Rc::new(Expr::Logical(Logical::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn equality(&mut self) -> Result<Expr> {
+    fn equality(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.comparison()?;
 
         while self.matches(&[TokenKind::BangEq, TokenKind::EqEq]) {
-            let operator = self.prev().unwrap().clone();
+            let op = self.prev().unwrap().clone();
             let right = self.comparison()?;
-            expr = Expr::Binary(Binary::new(Box::new(expr), operator, Box::new(right)));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr> {
+    fn comparison(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.term()?;
 
         while self.matches(&[TokenKind::Gt, TokenKind::GtEq, TokenKind::Lt, TokenKind::LtEq]) {
             let op = self.prev().unwrap().clone();
             let right = self.term()?;
-            expr = Expr::Binary(Binary::new(Box::new(expr), op, Box::new(right)));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expr> {
+    fn term(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.factor()?;
 
         while self.matches(&[TokenKind::Plus, TokenKind::Minus]) {
             let op = self.prev().unwrap().clone();
             let right = self.factor()?;
-            expr = Expr::Binary(Binary::new(Box::new(expr), op, Box::new(right)));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr> {
+    fn factor(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.unary()?;
 
         while self.matches(&[TokenKind::Slash, TokenKind::Star]) {
             let op = self.prev().unwrap().clone();
             let right = self.unary()?;
-            expr = Expr::Binary(Binary::new(Box::new(expr), op, Box::new(right)));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr> {
+    fn unary(&mut self) -> Result<Rc<Expr>> {
         if self.matches(&[TokenKind::Bang, TokenKind::Minus]) {
             let op = self.prev().unwrap().clone();
             let right = self.unary()?;
-            return Ok(Expr::Unary(Unary::new(op, Box::new(right))));
+            return Ok(Rc::new(Expr::Unary(Unary::new(op, Rc::clone(&right)))));
         }
 
         self.call()
     }
 
-    fn call(&mut self) -> Result<Expr> {
+    fn call(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.primary()?;
 
         loop {
@@ -479,8 +485,8 @@ impl Parser {
         Ok(expr)
     }
 
-    fn finish_call(&mut self, callee: Expr) -> Result<Expr> {
-        let mut args: Vec<Expr> = vec![];
+    fn finish_call(&mut self, callee: Rc<Expr>) -> Result<Rc<Expr>> {
+        let mut args: Vec<Rc<Expr>> = vec![];
         if !self.check(&TokenKind::RParen) {
             loop {
                 if args.len() >= 255 {
@@ -497,22 +503,28 @@ impl Parser {
         self.expect(&TokenKind::RParen)?;
         let paren = self.prev().unwrap().clone();
 
-        Ok(Expr::Call(Call::new(Box::new(callee), paren, args)))
+        Ok(Rc::new(Expr::Call(Call::new(callee, paren, args))))
     }
 
-    fn primary(&mut self) -> Result<Expr> {
+    fn primary(&mut self) -> Result<Rc<Expr>> {
         match &self.advance().kind {
             TokenKind::Fun => self.lambda_expression(),
-            TokenKind::Nil => Ok(Expr::Literal(Literal::new(Object::Nil))),
-            TokenKind::Ident(_) => Ok(Expr::Var(Var::new(self.prev().unwrap().clone()))),
-            TokenKind::True => Ok(Expr::Literal(Literal::new(Object::Bool(true)))),
-            TokenKind::False => Ok(Expr::Literal(Literal::new(Object::Bool(false)))),
-            TokenKind::Number(n) => Ok(Expr::Literal(Literal::new(Object::Number(*n)))),
-            TokenKind::Str(s) => Ok(Expr::Literal(Literal::new(Object::Str(s.clone())))),
+            TokenKind::Nil => Ok(Rc::new(Expr::Literal(Literal::new(Object::Nil)))),
+
+            TokenKind::Ident(_) => Ok(Rc::new(Expr::Var(Var::new(self.prev().unwrap().clone())))),
+
+            TokenKind::True => Ok(Rc::new(Expr::Literal(Literal::new(Object::Bool(true))))),
+
+            TokenKind::False => Ok(Rc::new(Expr::Literal(Literal::new(Object::Bool(false))))),
+
+            TokenKind::Number(n) => Ok(Rc::new(Expr::Literal(Literal::new(Object::Number(*n))))),
+
+            TokenKind::Str(s) => Ok(Rc::new(Expr::Literal(Literal::new(Object::Str(s.clone()))))),
+
             TokenKind::LParen => {
                 let expr = self.expression()?;
                 self.expect(&TokenKind::RParen)?;
-                Ok(Expr::Grouping(Grouping::new(Box::new(expr))))
+                Ok(Rc::new(Expr::Grouping(Grouping::new(expr))))
             }
             _ => {
                 self.error("Unknown Token");
@@ -521,7 +533,7 @@ impl Parser {
         }
     }
 
-    fn lambda_expression(&mut self) -> Result<Expr> {
+    fn lambda_expression(&mut self) -> Result<Rc<Expr>> {
         self.expect(&TokenKind::LParen)?;
         let mut parameters: Vec<Token> = vec![];
 
@@ -553,6 +565,6 @@ impl Parser {
 
         let body = self.block()?;
 
-        Ok(Expr::Lambda(Lambda::new(parameters, body)))
+        Ok(Rc::new(Expr::Lambda(Lambda::new(parameters, body))))
     }
 }

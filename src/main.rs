@@ -9,6 +9,7 @@ mod parser;
 mod stmt;
 mod token;
 mod token_kind;
+mod resolver;
 
 use core::panic;
 use std::env::args;
@@ -20,11 +21,12 @@ use crate::lexer::Lexer;
 use crate::token::Token;
 
 use ast_printer::AstPrinter;
-use error::LoxError::{Lexer as LexerError, Parser as ParserError, Runtime};
+use error::LoxError::{Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime};
 use error::LoxResult;
 
 use interpreter::Interpreter;
 use parser::Parser;
+use resolver::Resolver;
 use rustyline::DefaultEditor;
 
 fn run(source: &str, interpreter: &mut Interpreter) -> LoxResult<()> {
@@ -40,6 +42,12 @@ fn run(source: &str, interpreter: &mut Interpreter) -> LoxResult<()> {
     };
 
     println!("{}", AstPrinter::new().print(&stmts));
+
+    let mut resolver = Resolver::new(interpreter);
+    match resolver.resolve_stmts(&stmts) {
+        Ok(()) => {}
+        Err(e) => return Err(ResolverError(e)),
+    }
 
     match interpreter.interpret(&stmts) {
         Ok(()) => {}

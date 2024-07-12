@@ -74,7 +74,7 @@ impl TokenKind {
             Lt => "<".to_string(),
             LtEq => "<=".to_string(),
             Ident(str) | Str(str) => str.to_string(),
-            Number(num) => format!("{num}"),
+            Number(num) => format!("{}", num),
             And => "and".to_string(),
             Break => "break".to_string(),
             Class => "class".to_string(),

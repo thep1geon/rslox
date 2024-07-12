@@ -1,4 +1,5 @@
-use crate::expr;
+use std::rc::Rc;
+use crate::expr::Expr;
 use crate::token::Token;
 
 pub trait Visitor<T, E> {
@@ -29,106 +30,75 @@ pub enum Stmt {
 impl Stmt {
     pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
         match self {
-            Self::Expr(e) => e.accept(visitor),
-            Self::If(i) => i.accept(visitor),
-            Self::Print(p) => p.accept(visitor),
-            Self::VarDecl(v) => v.accept(visitor),
-            Self::While(w) => w.accept(visitor),
-            Self::Block(b) => b.accept(visitor),
-            Self::Function(f) => f.accept(visitor),
-            Self::Return(r) => r.accept(visitor),
-            Self::Break(b) => b.accept(visitor),
+            Self::Expr(e)     => visitor.expr(e),
+            Self::If(i)       => visitor.if_stmt(i),
+            Self::Print(p)    => visitor.print(p),
+            Self::VarDecl(v)  => visitor.vardecl(v),
+            Self::While(w)    => visitor.while_stmt(w),
+            Self::Block(b)    => visitor.block(b),
+            Self::Function(f) => visitor.function(f),
+            Self::Return(r)   => visitor.return_stmt(r),
+            Self::Break(b)    => visitor.break_stmt(b),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Expression {
-    pub expr: expr::Expr,
+    pub expr: Rc<Expr>,
 }
 
 impl Expression {
-    pub fn new(expr: expr::Expr) -> Self {
+    pub fn new(expr: Rc<Expr>) -> Self {
         Self { expr }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.expr(self)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct If {
-    pub condition: expr::Expr,
-    pub then_branch: Box<Stmt>,
-    pub else_branch: Option<Box<Stmt>>,
+    pub condition: Rc<Expr>,
+    pub then: Rc<Stmt>,
+    pub else_: Option<Rc<Stmt>>,
 }
 
 impl If {
-    pub fn new(
-        condition: expr::Expr,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
-    ) -> Self {
-        Self {
-            condition,
-            then_branch,
-            else_branch,
-        }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.if_stmt(self)
+    pub fn new(condition: Rc<Expr>, then: Rc<Stmt>, else_: Option<Rc<Stmt>>) -> Self {
+        Self { condition, then, else_ }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Print {
-    pub expr: expr::Expr,
+    pub expr: Rc<Expr>
 }
 
 impl Print {
-    pub fn new(expr: expr::Expr) -> Self {
+    pub fn new(expr: Rc<Expr>) -> Self {
         Self { expr }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.print(self)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct VarDecl {
     pub name: Token,
-    pub initializer: expr::Expr,
+    pub initializer: Rc<Expr>,
 }
 
 impl VarDecl {
-    pub fn new(name: Token, initializer: expr::Expr) -> Self {
+    pub fn new(name: Token, initializer: Rc<Expr>) -> Self {
         Self { name, initializer }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.vardecl(self)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct While {
-    pub condition: expr::Expr,
-    pub statement: Box<Stmt>,
+    pub condition: Rc<Expr>,
+    pub statement: Rc<Stmt>,
 }
 
 impl While {
-    pub fn new(condition: expr::Expr, statement: Box<Stmt>) -> Self {
-        Self {
-            condition,
-            statement,
-        }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.while_stmt(self)
+    pub fn new(condition: Rc<Expr>, statement: Rc<Stmt>) -> Self {
+        Self { condition, statement }
     }
 }
 
@@ -140,10 +110,6 @@ pub struct Block {
 impl Block {
     pub fn new(statements: Vec<Stmt>) -> Self {
         Self { statements }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.block(self)
     }
 }
 
@@ -158,25 +124,17 @@ impl Function {
     pub fn new(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
         Self { name, params, body }
     }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.function(self)
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Return {
     pub keyword: Token,
-    pub value: Option<expr::Expr>,
+    pub value: Option<Rc<Expr>>,
 }
 
 impl Return {
-    pub fn new(keyword: Token, value: Option<expr::Expr>) -> Self {
+    pub fn new(keyword: Token, value: Option<Rc<Expr>>) -> Self {
         Self { keyword, value }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.return_stmt(self)
     }
 }
 
@@ -185,10 +143,6 @@ pub struct Break;
 
 impl Break {
     pub fn new() -> Self {
-        Self { }
-    }
-
-    pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
-        visitor.break_stmt(self)
+        Self {}
     }
 }

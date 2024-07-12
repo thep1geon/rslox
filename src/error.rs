@@ -1,10 +1,11 @@
 use core::fmt;
 
-use crate::{interpreter, lexer, parser};
+use crate::{interpreter, lexer, parser, resolver};
 
 pub enum LoxError {
     Lexer(lexer::Error),
     Parser(parser::Error),
+    Resolver(resolver::Error),
     Runtime(interpreter::Error),
 }
 
@@ -13,6 +14,7 @@ impl LoxError {
         match self {
             Self::Lexer(l) => l.line,
             Self::Parser(p) => p.tok.line,
+            Self::Resolver(r) => r.tok.line,
             Self::Runtime(r) => r.line,
         }
     }
@@ -27,6 +29,7 @@ impl fmt::Display for LoxError {
         match self {
             Self::Parser(p) => write!(f, "{p}"),
             Self::Lexer(l) => write!(f, "{l}"),
+            Self::Resolver(r) => write!(f, "{r}"),
             Self::Runtime(r) => write!(f, "{r}"),
         }
     }

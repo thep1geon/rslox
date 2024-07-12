@@ -48,12 +48,12 @@ impl Callable {
 
 #[derive(Debug, Clone)]
 pub struct UserFunction {
-    pub decl: Function,
+    pub decl: Rc<Function>,
     pub closure: Rc<Env>,
 }
 
 impl UserFunction {
-    pub fn new(decl: Function, closure: Rc<Env>) -> Self {
+    pub fn new(decl: Rc<Function>, closure: Rc<Env>) -> Self {
         Self { decl, closure }
     }
 
@@ -86,12 +86,12 @@ impl UserFunction {
 
 #[derive(Debug, Clone)]
 pub struct LambdaFunction {
-    pub lambda: Lambda,
+    pub lambda: Rc<Lambda>,
     pub closure: Rc<Env>,
 }
 
 impl LambdaFunction {
-    pub fn new(lambda: Lambda, closure: Rc<Env>) -> Self {
+    pub fn new(lambda: Rc<Lambda>, closure: Rc<Env>) -> Self {
         Self { lambda, closure }
     }
 

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     expr::{self, Expr},
     stmt::{self, Stmt},
@@ -14,44 +16,43 @@ impl AstPrinter {
 }
 
 impl expr::Visitor<String, ()> for AstPrinter {
-    fn binary(&mut self, expr: &expr::Binary) -> Result<String, ()> {
-        Ok(self.parenthesize(expr.op.kind.as_string(), &[&expr.left, &expr.right]))
+    fn binary(&mut self, expr: Rc<expr::Binary>) -> Result<String, ()> {
+        Ok(self.parenthesize(expr.op.kind.as_string(), &[Rc::clone(&expr.left), Rc::clone(&expr.right)]))
     }
 
-    fn grouping(&mut self, expr: &expr::Grouping) -> Result<String, ()> {
-        Ok(self.parenthesize("group".to_string(), &[&expr.expr]))
+    fn grouping(&mut self, expr: Rc<expr::Grouping>) -> Result<String, ()> {
+        Ok(self.parenthesize("group".to_string(), &[Rc::clone(&expr.expr)]))
     }
 
-    fn literal(&mut self, expr: &expr::Literal) -> Result<String, ()> {
+    fn literal(&mut self, expr: Rc<expr::Literal>) -> Result<String, ()> {
         Ok(format!("{}", expr.lit))
     }
 
-    fn unary(&mut self, expr: &expr::Unary) -> Result<String, ()> {
-        Ok(self.parenthesize(expr.op.kind.as_string(), &[&expr.expr]))
+    fn unary(&mut self, expr: Rc<expr::Unary>) -> Result<String, ()> {
+        Ok(self.parenthesize(expr.op.kind.as_string(), &[Rc::clone(&expr.expr)]))
     }
 
-    fn var(&mut self, expr: &expr::Var) -> Result<String, ()> {
+    fn var(&mut self, expr: Rc<expr::Var>) -> Result<String, ()> {
         Ok(self.parenthesize(expr.name.kind.as_string(), &[]))
     }
 
-    fn assignment(&mut self, expr: &expr::Assignment) -> Result<String, ()> {
+    fn assignment(&mut self, expr: Rc<expr::Assignment>) -> Result<String, ()> {
         Ok(self.parenthesize(
             "ASSIGN ".to_owned() + &expr.name.kind.as_string(),
-            &[&expr.value],
+            &[expr.value.clone()],
         ))
     }
 
-    fn logical(&mut self, expr: &expr::Logical) -> Result<String, ()> {
-        Ok(self.parenthesize(expr.op.kind.as_string(), &[&expr.left, &expr.right]))
+    fn logical(&mut self, expr: Rc<expr::Logical>) -> Result<String, ()> {
+        Ok(self.parenthesize(expr.op.kind.as_string(), &[Rc::clone(&expr.left), Rc::clone(&expr.right)]))
     }
 
-    fn call(&mut self, expr: &expr::Call) -> Result<String, ()> {
-        let args = &expr.args.iter().collect::<Vec<_>>();
+    fn call(&mut self, expr: Rc<expr::Call>) -> Result<String, ()> {
         let callee = expr.callee.accept(self).unwrap();
-        Ok(self.parenthesize(callee, args))
+        Ok(self.parenthesize(callee, &expr.args))
     }
 
-    fn lambda(&mut self, expr: &expr::Lambda) -> Result<String, ()> {
+    fn lambda(&mut self, expr: Rc<expr::Lambda>) -> Result<String, ()> {
         let mut str = String::from("(FN");
 
         str += " (";
@@ -89,17 +90,17 @@ impl expr::Visitor<String, ()> for AstPrinter {
 
 impl stmt::Visitor<String, ()> for AstPrinter {
     fn print(&mut self, stmt: &stmt::Print) -> Result<String, ()> {
-        Ok(self.parenthesize("PRINT".to_string(), &[&stmt.expr]))
+        Ok(self.parenthesize("PRINT".to_string(), &[Rc::clone(&stmt.expr)]))
     }
 
     fn vardecl(&mut self, stmt: &stmt::VarDecl) -> Result<String, ()> {
         let name = "VAR ".to_owned() + &stmt.name.kind.as_string();
         let init = &stmt.initializer;
-        Ok(self.parenthesize(name, &[init]))
+        Ok(self.parenthesize(name, &[Rc::clone(&init)]))
     }
 
     fn expr(&mut self, stmt: &stmt::Expression) -> Result<String, ()> {
-        Ok(self.parenthesize("".to_string(), &[&stmt.expr]))
+        Ok(self.parenthesize("".to_string(), &[Rc::clone(&stmt.expr)]))
     }
 
     fn block(&mut self, stmt: &stmt::Block) -> Result<String, ()> {
@@ -132,8 +133,8 @@ impl stmt::Visitor<String, ()> for AstPrinter {
         for _ in 0..self.depth {
             str += "    ";
         }
-        str += &stmt.then_branch.accept(self).unwrap();
-        if let Some(else_b) = &stmt.else_branch {
+        str += &stmt.then.accept(self).unwrap();
+        if let Some(else_b) = &stmt.else_ {
             str += "\n";
             for _ in 0..self.depth {
                 str += "    ";
@@ -237,7 +238,7 @@ impl AstPrinter {
         str
     }
 
-    fn parenthesize(&mut self, name: String, exprs: &[&Expr]) -> String {
+    fn parenthesize(&mut self, name: String, exprs: &[Rc<Expr>]) -> String {
         let mut str = "(".to_string();
         str += &name;
         for expr in exprs {

@@ -1,7 +1,6 @@
-fun add(a) {
-    return fun (b) {
-        return a + b;
-    };
-}
+var fib = fun (n) {
+    if (n <= 1) return n;
+    return fib(n-2) + fib(n-1);
+};
 
-print add(3)(4);
+println(fib(20));
