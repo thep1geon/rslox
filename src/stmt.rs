@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 use crate::expr::{self, Expr};
-use crate::token::Token;
+=======
 use std::rc::Rc;
+use crate::expr::Expr;
+>>>>>>> parent of cfea157 (Finish Ch 12)
+use crate::token::Token;
 
 pub trait Visitor<T, E> {
     fn expr(&mut self, stmt: &Expression) -> Result<T, E>;
@@ -12,7 +16,6 @@ pub trait Visitor<T, E> {
     fn function(&mut self, stmt: &Function) -> Result<T, E>;
     fn return_stmt(&mut self, stmt: &Return) -> Result<T, E>;
     fn break_stmt(&mut self, stmt: &Break) -> Result<T, E>;
-    fn class_decl(&mut self, stmt: &ClassDecl) -> Result<T, E>;
 }
 
 #[derive(Debug, Clone)]
@@ -26,22 +29,20 @@ pub enum Stmt {
     Function(Function),
     Return(Return),
     Break(Break),
-    ClassDecl(ClassDecl),
 }
 
 impl Stmt {
     pub fn accept<T, E>(&self, visitor: &mut dyn Visitor<T, E>) -> Result<T, E> {
         match self {
-            Self::Expr(e) => visitor.expr(e),
-            Self::If(i) => visitor.if_stmt(i),
-            Self::Print(p) => visitor.print(p),
-            Self::VarDecl(v) => visitor.vardecl(v),
-            Self::While(w) => visitor.while_stmt(w),
-            Self::Block(b) => visitor.block(b),
+            Self::Expr(e)     => visitor.expr(e),
+            Self::If(i)       => visitor.if_stmt(i),
+            Self::Print(p)    => visitor.print(p),
+            Self::VarDecl(v)  => visitor.vardecl(v),
+            Self::While(w)    => visitor.while_stmt(w),
+            Self::Block(b)    => visitor.block(b),
             Self::Function(f) => visitor.function(f),
-            Self::Return(r) => visitor.return_stmt(r),
-            Self::Break(b) => visitor.break_stmt(b),
-            Self::ClassDecl(c) => visitor.class_decl(c),
+            Self::Return(r)   => visitor.return_stmt(r),
+            Self::Break(b)    => visitor.break_stmt(b),
         }
     }
 }
@@ -66,17 +67,13 @@ pub struct If {
 
 impl If {
     pub fn new(condition: Rc<Expr>, then: Rc<Stmt>, else_: Option<Rc<Stmt>>) -> Self {
-        Self {
-            condition,
-            then,
-            else_,
-        }
+        Self { condition, then, else_ }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Print {
-    pub expr: Rc<Expr>,
+    pub expr: Rc<Expr>
 }
 
 impl Print {
@@ -105,10 +102,7 @@ pub struct While {
 
 impl While {
     pub fn new(condition: Rc<Expr>, statement: Rc<Stmt>) -> Self {
-        Self {
-            condition,
-            statement,
-        }
+        Self { condition, statement }
     }
 }
 
@@ -156,6 +150,7 @@ impl Break {
         Self {}
     }
 }
+<<<<<<< HEAD
 
 #[derive(Debug, Clone)]
 pub struct ClassDecl {
@@ -173,3 +168,5 @@ impl ClassDecl {
         }
     }
 }
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)

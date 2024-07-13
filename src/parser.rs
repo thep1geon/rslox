@@ -1,13 +1,17 @@
 use std::fmt;
 use std::rc::Rc;
 
+<<<<<<< HEAD
 use crate::expr::{
     Assignment, Binary, Call, Expr, Get, Grouping, Lambda, Literal, Logical, Set, Super, This,
     Unary, Var,
 };
+=======
+use crate::expr::{Assignment, Binary, Call, Expr, Grouping, Lambda, Literal, Logical, Unary, Var};
+>>>>>>> parent of cfea157 (Finish Ch 12)
 use crate::object::Object;
 use crate::stmt::{
-    self, Block, Break, ClassDecl, Expression, Function, If, Print, Return, Stmt, VarDecl, While,
+    Block, Break, Expression, Function, If, Print, Return, Stmt, VarDecl, While,
 };
 use crate::token::Token;
 use crate::token_kind::TokenKind;
@@ -25,7 +29,7 @@ impl Error {
     pub fn unexpected_token(tok: Token) -> Self {
         Self {
             kind: ErrorKind::UnexpectedToken,
-            tok,
+            tok
         }
     }
 }
@@ -33,9 +37,9 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            ErrorKind::UnexpectedToken => write!(f, "UnexpectedToken"),
+            ErrorKind::UnexpectedToken => write!(f, "UnexpectedToken"), 
         }
-    }
+    } 
 }
 
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -75,8 +79,7 @@ impl Parser {
             self.current += 1;
         }
 
-        self.prev()
-            .expect("We just advanced, there should be a previous token")
+        self.prev().expect("We just advanced, there should be a previous token")
     }
 
     fn expect(&mut self, kind: &TokenKind) -> Result<()> {
@@ -97,11 +100,7 @@ impl Parser {
     }
 
     fn error(&self, msg: &str) {
-        eprintln!(
-            "[Line:{}] Error at '{}': {msg}",
-            self.peek().line,
-            self.peek().kind.as_string()
-        );
+        eprintln!("[Line:{}] Error at '{}': {msg}", self.peek().line, self.peek().kind.as_string());
     }
 
     fn matches(&mut self, toks: &[TokenKind]) -> bool {
@@ -154,10 +153,6 @@ impl Parser {
     }
 
     fn declaration(&mut self) -> Result<Stmt> {
-        if self.matches(&[TokenKind::Class]) {
-            return self.class_declaration();
-        }
-
         if self.matches(&[TokenKind::Var]) {
             return self.var_declaration();
         }
@@ -169,6 +164,7 @@ impl Parser {
         self.statement()
     }
 
+<<<<<<< HEAD
     fn class_declaration(&mut self) -> Result<Stmt> {
         if !matches!(self.peek().kind, TokenKind::Ident(_)) {
             self.error(
@@ -214,6 +210,8 @@ impl Parser {
         Ok(Stmt::ClassDecl(ClassDecl::new(name, superclass, methods)))
     }
 
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
     fn function_declaration(&mut self) -> Result<Stmt> {
         if !matches!(self.peek().kind, TokenKind::Ident(_)) {
             self.error(
@@ -275,7 +273,7 @@ impl Parser {
 
         let name = self.advance().clone();
 
-        let mut init = Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Nil))));
+        let mut init = Rc::new(Expr::Literal(Literal::new(Object::Nil)));
 
         if self.matches(&[TokenKind::Eq]) {
             init = self.expression()?;
@@ -355,9 +353,7 @@ impl Parser {
         }
 
         if condition.is_none() {
-            condition = Some(Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Bool(
-                true,
-            ))))));
+            condition = Some(Rc::new(Expr::Literal(Literal::new(Object::Bool(true)))));
         }
 
         body = Stmt::While(While::new(condition.unwrap(), Rc::new(body)));
@@ -439,21 +435,7 @@ impl Parser {
                     _ => unreachable!(),
                 };
 
-                return Ok(Rc::new(Expr::Assignment(Assignment::new(
-                    name,
-                    Rc::clone(&value),
-                ))));
-            } else if matches!(expr.as_ref(), Expr::Get(_)) {
-                let expr = match &expr.as_ref() {
-                    Expr::Get(v) => v,
-                    _ => unreachable!(),
-                };
-
-                return Ok(Rc::new(Expr::Set(Set::new(
-                    Rc::clone(&expr.object),
-                    expr.name.clone(),
-                    Rc::clone(&value),
-                ))));
+                return Ok(Rc::new(Expr::Assignment(Assignment::new(name, Rc::clone(&value)))));
             }
 
             self.error("Invalid assignment target");
@@ -468,11 +450,7 @@ impl Parser {
         while self.matches(&[TokenKind::Or]) {
             let op = self.prev().unwrap().clone();
             let right = self.logical_and()?;
-            expr = Rc::new(Expr::Logical(Logical::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Logical(Logical::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -484,11 +462,7 @@ impl Parser {
         while self.matches(&[TokenKind::And]) {
             let op = self.prev().unwrap().clone();
             let right = self.logical_and()?;
-            expr = Rc::new(Expr::Logical(Logical::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Logical(Logical::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -500,11 +474,7 @@ impl Parser {
         while self.matches(&[TokenKind::BangEq, TokenKind::EqEq]) {
             let op = self.prev().unwrap().clone();
             let right = self.comparison()?;
-            expr = Rc::new(Expr::Binary(Binary::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -513,19 +483,10 @@ impl Parser {
     fn comparison(&mut self) -> Result<Rc<Expr>> {
         let mut expr = self.term()?;
 
-        while self.matches(&[
-            TokenKind::Gt,
-            TokenKind::GtEq,
-            TokenKind::Lt,
-            TokenKind::LtEq,
-        ]) {
+        while self.matches(&[TokenKind::Gt, TokenKind::GtEq, TokenKind::Lt, TokenKind::LtEq]) {
             let op = self.prev().unwrap().clone();
             let right = self.term()?;
-            expr = Rc::new(Expr::Binary(Binary::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -537,11 +498,7 @@ impl Parser {
         while self.matches(&[TokenKind::Plus, TokenKind::Minus]) {
             let op = self.prev().unwrap().clone();
             let right = self.factor()?;
-            expr = Rc::new(Expr::Binary(Binary::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -553,11 +510,7 @@ impl Parser {
         while self.matches(&[TokenKind::Slash, TokenKind::Star]) {
             let op = self.prev().unwrap().clone();
             let right = self.unary()?;
-            expr = Rc::new(Expr::Binary(Binary::new(
-                Rc::clone(&expr),
-                op,
-                Rc::clone(&right),
-            )));
+            expr = Rc::new(Expr::Binary(Binary::new(Rc::clone(&expr), op, Rc::clone(&right))));
         }
 
         Ok(expr)
@@ -577,25 +530,11 @@ impl Parser {
         let mut expr = self.primary()?;
 
         loop {
-            if self.matches(&[TokenKind::LParen]) {
-                expr = self.finish_call(expr)?;
-            } else if self.matches(&[TokenKind::Dot]) {
-                if !matches!(self.peek().kind, TokenKind::Ident(_)) {
-                    self.error(
-                        format!(
-                            "Expected: IDENTIFIER but got '{}' instead",
-                            self.peek().kind.as_string()
-                        )
-                        .as_str(),
-                    );
-                    return Err(Error::unexpected_token(self.peek().clone()));
-                }
-
-                let name = self.advance().clone();
-                expr = Rc::new(Expr::Get(Get::new(Rc::clone(&expr), name)))
-            } else {
+            if !self.matches(&[TokenKind::LParen]) {
                 break;
             }
+
+            expr = self.finish_call(expr)?;
         }
 
         Ok(expr)
@@ -625,25 +564,24 @@ impl Parser {
     fn primary(&mut self) -> Result<Rc<Expr>> {
         match &self.advance().kind {
             TokenKind::Fun => self.lambda_expression(),
-            TokenKind::Nil => Ok(Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Nil))))),
+            TokenKind::Nil => Ok(Rc::new(Expr::Literal(Literal::new(Object::Nil)))),
+
             TokenKind::Ident(_) => Ok(Rc::new(Expr::Var(Var::new(self.prev().unwrap().clone())))),
-            TokenKind::True => Ok(Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Bool(
-                true,
-            )))))),
-            TokenKind::False => Ok(Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Bool(
-                false,
-            )))))),
-            TokenKind::Number(n) => Ok(Rc::new(Expr::Literal(Literal::new(Rc::new(
-                Object::Number(*n),
-            ))))),
-            TokenKind::Str(s) => Ok(Rc::new(Expr::Literal(Literal::new(Rc::new(Object::Str(
-                s.clone(),
-            )))))),
+
+            TokenKind::True => Ok(Rc::new(Expr::Literal(Literal::new(Object::Bool(true))))),
+
+            TokenKind::False => Ok(Rc::new(Expr::Literal(Literal::new(Object::Bool(false))))),
+
+            TokenKind::Number(n) => Ok(Rc::new(Expr::Literal(Literal::new(Object::Number(*n))))),
+
+            TokenKind::Str(s) => Ok(Rc::new(Expr::Literal(Literal::new(Object::Str(s.clone()))))),
+
             TokenKind::LParen => {
                 let expr = self.expression()?;
                 self.expect(&TokenKind::RParen)?;
                 Ok(Rc::new(Expr::Grouping(Grouping::new(expr))))
             }
+<<<<<<< HEAD
             TokenKind::This => Ok(Rc::new(Expr::This(This::new(self.prev().unwrap().clone())))),
             TokenKind::Super => {
                 let keyword = self.prev().unwrap().clone();
@@ -663,6 +601,8 @@ impl Parser {
 
                 Ok(Rc::new(Expr::Super(Super::new(keyword, method))))
             }
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
             _ => {
                 self.error("Unknown Token");
                 Err(Error::unexpected_token(self.peek().clone()))

@@ -2,19 +2,21 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::expr::{self, Expr};
+use crate::expr::{self, Expr}; 
 use crate::interpreter::Interpreter;
 use crate::stmt::{self, Stmt};
 use crate::token::Token;
 
 pub enum ErrorKind {
-    ThisUsedOutsideClass,
-    LocalVariableInitSelf,
+    LocalVariableInitSelf, 
     VariableAlreadyDefined,
     CannotReturnFromTopLevel,
+<<<<<<< HEAD
     SuperUsedOutsideSubClass,
     CannotReturnFromInitFunction,
     ClassCannotInherirFromItself,
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 }
 
 pub struct Error {
@@ -43,6 +45,7 @@ impl Error {
             tok,
         }
     }
+<<<<<<< HEAD
 
     pub fn this_used_outside_class(tok: Token) -> Self {
         Self {
@@ -71,18 +74,22 @@ impl Error {
             tok,
         }
     }
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            ErrorKind::ThisUsedOutsideClass => write!(f, "ThisUsedOutsideClass"),
             ErrorKind::LocalVariableInitSelf => write!(f, "LocalVariableInitSelf"),
             ErrorKind::VariableAlreadyDefined => write!(f, "VariableAlreadyDefined"),
             ErrorKind::CannotReturnFromTopLevel => write!(f, "CannotReturnFromTopLevel"),
+<<<<<<< HEAD
             ErrorKind::SuperUsedOutsideSubClass => write!(f, "SuperUsedOutsideSubClass"),
             ErrorKind::CannotReturnFromInitFunction => write!(f, "CannotReturnFromInitFunction"),
             ErrorKind::ClassCannotInherirFromItself => write!(f, "ClassCannotInherirFromItself"),
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
         }
     }
 }
@@ -90,12 +97,11 @@ impl fmt::Display for Error {
 #[derive(Clone, Copy, PartialEq)]
 enum FunctionType {
     None,
-    Method,
     Function,
-    Initializer,
     Lambda,
 }
 
+<<<<<<< HEAD
 #[derive(Clone, Copy, PartialEq)]
 enum ClassType {
     None,
@@ -103,11 +109,12 @@ enum ClassType {
     Subclass,
 }
 
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 pub struct Resolver<'a> {
     pub interpreter: &'a mut Interpreter,
     pub scopes: Vec<HashMap<String, bool>>,
     current_func: FunctionType,
-    current_class: ClassType,
 }
 
 impl<'a> Resolver<'a> {
@@ -116,7 +123,6 @@ impl<'a> Resolver<'a> {
             interpreter,
             scopes: vec![],
             current_func: FunctionType::None,
-            current_class: ClassType::None,
         }
     }
 
@@ -140,7 +146,7 @@ impl<'a> Resolver<'a> {
         let scopes = self.scopes.iter().rev().enumerate();
         for (i, scope) in scopes {
             if scope.contains_key(&name.kind.as_string()) {
-                self.interpreter.resolve(expr, i + 1);
+                self.interpreter.resolve(expr, i+1);
                 return Ok(());
             }
         }
@@ -148,11 +154,7 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_function(
-        &mut self,
-        stmt: &stmt::Function,
-        func_type: FunctionType,
-    ) -> Result<(), Error> {
+    fn resolve_function(&mut self, stmt: &stmt::Function, func_type: FunctionType) -> Result<(), Error>{
         let enclosing_func = self.current_func;
         self.current_func = func_type;
         self.begin_scope();
@@ -167,11 +169,7 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_lambda(
-        &mut self,
-        expr: &expr::Lambda,
-        func_type: FunctionType,
-    ) -> Result<(), Error> {
+    fn resolve_lambda(&mut self, expr: &expr::Lambda, func_type: FunctionType) -> Result<(), Error> {
         let enclosing_func = self.current_func;
         self.current_func = func_type;
         self.begin_scope();
@@ -203,19 +201,11 @@ impl<'a> Resolver<'a> {
             return Ok(());
         }
 
-        if self
-            .scopes
-            .last()
-            .unwrap()
-            .contains_key(&name.kind.as_string())
-        {
+        if self.scopes.last().unwrap().contains_key(&name.kind.as_string()) {
             return Err(Error::variable_already_defined(name.clone()));
         }
 
-        self.scopes
-            .last_mut()
-            .unwrap()
-            .insert(name.kind.as_string(), false);
+        self.scopes.last_mut().unwrap().insert(name.kind.as_string(), false);
         Ok(())
     }
 
@@ -224,16 +214,13 @@ impl<'a> Resolver<'a> {
             return;
         }
 
-        self.scopes
-            .last_mut()
-            .unwrap()
-            .insert(name.kind.as_string(), true);
+        self.scopes.last_mut().unwrap().insert(name.kind.as_string(), true);
     }
 }
 
 impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
     fn block(&mut self, stmt: &stmt::Block) -> Result<(), Error> {
-        self.begin_scope();
+        self.begin_scope(); 
         self.resolve_stmts(&stmt.statements)?;
         self.end_scope();
         Ok(())
@@ -265,7 +252,7 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
 
         match &stmt.else_ {
             Some(else_) => self.resolve_stmt(else_),
-            None => Ok(()),
+            None => Ok(())
         }
     }
 
@@ -279,6 +266,7 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
         }
 
         match &stmt.value {
+<<<<<<< HEAD
             Some(val) => {
                 if self.current_func == FunctionType::Initializer {
                     return Err(Error::cannot_return_from_init_function(
@@ -288,6 +276,10 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
                 self.resolve_expr(val)
             }
             None => Ok(()),
+=======
+            Some(val) => self.resolve_expr(val),
+            None => Ok(())
+>>>>>>> parent of cfea157 (Finish Ch 12)
         }
     }
 
@@ -299,6 +291,7 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
     fn break_stmt(&mut self, _stmt: &stmt::Break) -> Result<(), Error> {
         Ok(())
     }
+<<<<<<< HEAD
 
     fn class_decl(&mut self, stmt: &stmt::ClassDecl) -> Result<(), Error> {
         let prev_class = self.current_class;
@@ -351,11 +344,13 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
         self.current_class = prev_class;
         Ok(())
     }
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 }
 
 impl<'a> expr::Visitor<(), Error> for Resolver<'a> {
     fn var(&mut self, expr: Rc<expr::Var>) -> Result<(), Error> {
-        if !self.scopes.is_empty() {
+        if !self.scopes.is_empty() { 
             if let Some(var) = self.curr_scope().get(&expr.name.kind.as_string()) {
                 if !(*var) {
                     return Err(Error::local_variable_init_self(expr.name.clone()));
@@ -409,6 +404,7 @@ impl<'a> expr::Visitor<(), Error> for Resolver<'a> {
     fn lambda(&mut self, expr: Rc<expr::Lambda>) -> Result<(), Error> {
         self.resolve_lambda(&expr, FunctionType::Lambda)
     }
+<<<<<<< HEAD
 
     fn get(&mut self, expr: Rc<expr::Get>) -> Result<(), Error> {
         self.resolve_expr(&expr.object)
@@ -434,4 +430,6 @@ impl<'a> expr::Visitor<(), Error> for Resolver<'a> {
 
         self.resolve_local(Rc::new(Expr::Super(Rc::clone(&expr))), &expr.keyword)
     }
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 }

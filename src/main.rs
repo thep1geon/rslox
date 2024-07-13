@@ -1,16 +1,15 @@
 mod ast_printer;
 mod callable;
-mod class;
 mod error;
 mod expr;
 mod interpreter;
 mod lexer;
 mod object;
 mod parser;
-mod resolver;
 mod stmt;
 mod token;
 mod token_kind;
+mod resolver;
 
 use core::panic;
 use std::env::args;
@@ -22,9 +21,13 @@ use crate::lexer::Lexer;
 use crate::token::Token;
 
 use ast_printer::AstPrinter;
+<<<<<<< HEAD
 use error::LoxError::{
     Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime,
 };
+=======
+use error::LoxError::{Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime};
+>>>>>>> parent of cfea157 (Finish Ch 12)
 use error::LoxResult;
 
 use interpreter::Interpreter;

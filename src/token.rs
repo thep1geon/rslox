@@ -1,6 +1,6 @@
 use crate::token_kind::TokenKind;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub line: usize,

@@ -1,13 +1,15 @@
 program     -> declaration* EOF ;
 
-declaration -> class_decl
-             | fun_decl
+declaration -> fun_decl
              | var_decl
              | statement ;
 
+<<<<<<< HEAD
 class_decl  -> "class" IDENTIFIER ( "<" IDENTIFIER )?
                "{" function* "}" ;
 
+=======
+>>>>>>> parent of cfea157 (Finish Ch 12)
 fun_decl    -> "fun" function ;
 
 function    -> IDENTIFIER "(" parameters? ")" block ;
@@ -42,7 +44,7 @@ print_stmt  -> "print" expression ";" ;
 
 expression  -> assignment ;
 
-assignment  -> ( call "." )? IDENTIFIER "=" assignment
+assignment  -> IDENTIFIER "=" assignment
              | logic_or ;
 
 logic_or    -> logic_and ( "or" logic_and )* ;
@@ -60,7 +62,7 @@ factor      -> unary ( ( "/" | "*" ) unary )* ;
 unary       -> ( "!" | "-" ) unary 
              | call ;
 
-call        -> primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
+call        -> primary ( "(" arguments? ")" )* ;
 
 arguments   -> expression ( "," expression )* ;
 
