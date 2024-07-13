@@ -1,7 +1,7 @@
 use crate::token::Token;
 use crate::token_kind::TokenKind::*;
-use std::fmt;
 use std::collections::HashMap;
+use std::fmt;
 
 pub enum ErrorKind {
     ByteToStringConversion,
@@ -17,23 +17,23 @@ pub struct Error {
 
 impl Error {
     pub fn byte_to_string_conversion(line: usize) -> Self {
-        Self { 
-            kind: ErrorKind::ByteToStringConversion, 
-            line, 
+        Self {
+            kind: ErrorKind::ByteToStringConversion,
+            line,
         }
     }
 
     pub fn number_parsing(line: usize) -> Self {
-        Self { 
-            kind: ErrorKind::NumberParsing, 
-            line, 
+        Self {
+            kind: ErrorKind::NumberParsing,
+            line,
         }
     }
 
     pub fn unknown_character(line: usize) -> Self {
-        Self { 
-            kind: ErrorKind::UnknownCharacter, 
-            line, 
+        Self {
+            kind: ErrorKind::UnknownCharacter,
+            line,
         }
     }
 
@@ -92,22 +92,32 @@ impl<'a> Lexer<'a> {
 
     fn init_keywords(&mut self) {
         self.keywords.insert("and".to_string(), Token::new(And, 0));
-        self.keywords.insert("break".to_string(), Token::new(Break, 0));
-        self.keywords.insert("class".to_string(), Token::new(Class, 0));
-        self.keywords.insert("else".to_string(), Token::new(Else, 0));
-        self.keywords.insert("false".to_string(), Token::new(False, 0));
+        self.keywords
+            .insert("break".to_string(), Token::new(Break, 0));
+        self.keywords
+            .insert("class".to_string(), Token::new(Class, 0));
+        self.keywords
+            .insert("else".to_string(), Token::new(Else, 0));
+        self.keywords
+            .insert("false".to_string(), Token::new(False, 0));
         self.keywords.insert("for".to_string(), Token::new(For, 0));
         self.keywords.insert("fun".to_string(), Token::new(Fun, 0));
         self.keywords.insert("if".to_string(), Token::new(If, 0));
         self.keywords.insert("nil".to_string(), Token::new(Nil, 0));
         self.keywords.insert("or".to_string(), Token::new(Or, 0));
-        self.keywords.insert("print".to_string(), Token::new(Print, 0));
-        self.keywords.insert("return".to_string(), Token::new(Return, 0));
-        self.keywords.insert("super".to_string(), Token::new(Super, 0));
-        self.keywords.insert("this".to_string(), Token::new(This, 0));
-        self.keywords.insert("true".to_string(), Token::new(True, 0));
+        self.keywords
+            .insert("print".to_string(), Token::new(Print, 0));
+        self.keywords
+            .insert("return".to_string(), Token::new(Return, 0));
+        self.keywords
+            .insert("super".to_string(), Token::new(Super, 0));
+        self.keywords
+            .insert("this".to_string(), Token::new(This, 0));
+        self.keywords
+            .insert("true".to_string(), Token::new(True, 0));
         self.keywords.insert("var".to_string(), Token::new(Var, 0));
-        self.keywords.insert("while".to_string(), Token::new(While, 0));
+        self.keywords
+            .insert("while".to_string(), Token::new(While, 0));
     }
 
     fn peek(&self) -> char {

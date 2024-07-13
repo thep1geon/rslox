@@ -1,6 +1,35 @@
-var fib = fun (n) {
-    if (n <= 1) return n;
-    return fib(n-2) + fib(n-1);
-};
+class Node {
+    init(n) {
+        this.data = n;
+        this.next = nil;
+    }
+}
 
-println(fib(20));
+class List {
+    init() {
+        this.len = 0;
+        this.head = Node(nil);
+    }
+
+    push(n) {
+        var next = Node(n);
+        this.len = this.len + 1;
+
+        if (this.head.data == nil) {
+            this.head = next;
+            return;
+        }
+
+        var curr = this.head;
+        while (curr.next != nil) {
+            curr = curr.next;
+        }
+
+        curr.next = next;
+    }
+}
+
+var list = List();
+println(list.head.data);
+list.push(5);
+println(list.head.data);

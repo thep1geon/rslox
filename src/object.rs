@@ -1,10 +1,14 @@
 use core::{fmt, panic};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::callable::Callable;
+use crate::class::Instance;
 
 #[derive(Debug, Clone)]
 pub enum Object {
     Nil,
+    Instance(Rc<RefCell<Instance>>),
     Func(Callable),
     Bool(bool),
     Number(f64),
@@ -19,7 +23,7 @@ impl Object {
         }
     }
 
-    pub fn get_func(&mut self) -> &mut Callable {
+    pub fn get_func(&self) -> &Callable {
         match self {
             Self::Func(f) => f,
             _ => panic!("Tried getting a function out of a non function object"),
@@ -49,6 +53,7 @@ impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Nil => write!(f, "nil"),
+            Self::Instance(i) => write!(f, "<{} instance>", i.borrow().class.name.kind.as_string()),
             Self::Func(func) => write!(f, "<fn {}>", func.name()),
             Self::Bool(b) => write!(f, "{b}"),
             Self::Number(n) => write!(f, "{n}"),

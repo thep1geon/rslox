@@ -9,6 +9,7 @@ pub struct AstPrinter {
     depth: i32,
 }
 
+#[allow(dead_code)]
 impl AstPrinter {
     pub fn new() -> Self {
         Self { depth: 0 }
@@ -17,7 +18,10 @@ impl AstPrinter {
 
 impl expr::Visitor<String, ()> for AstPrinter {
     fn binary(&mut self, expr: Rc<expr::Binary>) -> Result<String, ()> {
-        Ok(self.parenthesize(expr.op.kind.as_string(), &[Rc::clone(&expr.left), Rc::clone(&expr.right)]))
+        Ok(self.parenthesize(
+            expr.op.kind.as_string(),
+            &[Rc::clone(&expr.left), Rc::clone(&expr.right)],
+        ))
     }
 
     fn grouping(&mut self, expr: Rc<expr::Grouping>) -> Result<String, ()> {
@@ -44,7 +48,10 @@ impl expr::Visitor<String, ()> for AstPrinter {
     }
 
     fn logical(&mut self, expr: Rc<expr::Logical>) -> Result<String, ()> {
-        Ok(self.parenthesize(expr.op.kind.as_string(), &[Rc::clone(&expr.left), Rc::clone(&expr.right)]))
+        Ok(self.parenthesize(
+            expr.op.kind.as_string(),
+            &[Rc::clone(&expr.left), Rc::clone(&expr.right)],
+        ))
     }
 
     fn call(&mut self, expr: Rc<expr::Call>) -> Result<String, ()> {
@@ -79,12 +86,38 @@ impl expr::Visitor<String, ()> for AstPrinter {
         self.depth -= 1;
 
         str += "\n";
-        for _ in 0..self.depth-1 {
+        for _ in 0..self.depth - 1 {
             str += "    "
         }
         str += ")";
 
         Ok(str)
+    }
+
+    fn get(&mut self, expr: Rc<expr::Get>) -> Result<String, ()> {
+        let mut str = String::from("(GET ");
+        str += &expr.object.accept(self).unwrap();
+        str += " ";
+        str += &expr.name.kind.as_string();
+        str += ")";
+        Ok(str)
+    }
+
+    fn set(&mut self, expr: Rc<expr::Set>) -> Result<String, ()> {
+        let mut str = String::from("(SET ");
+        str += "(";
+        str += &expr.object.accept(self).unwrap();
+        str += " ";
+        str += &expr.name.kind.as_string();
+        str += ")";
+        str += " ";
+        str += &expr.value.accept(self).unwrap();
+        str += ")";
+        Ok(str)
+    }
+
+    fn this(&mut self, _: Rc<expr::This>) -> Result<String, ()> {
+        Ok(self.parenthesize("THIS".to_string(), &[]))
     }
 }
 
@@ -96,7 +129,7 @@ impl stmt::Visitor<String, ()> for AstPrinter {
     fn vardecl(&mut self, stmt: &stmt::VarDecl) -> Result<String, ()> {
         let name = "VAR ".to_owned() + &stmt.name.kind.as_string();
         let init = &stmt.initializer;
-        Ok(self.parenthesize(name, &[Rc::clone(&init)]))
+        Ok(self.parenthesize(name, &[Rc::clone(init)]))
     }
 
     fn expr(&mut self, stmt: &stmt::Expression) -> Result<String, ()> {
@@ -187,7 +220,11 @@ impl stmt::Visitor<String, ()> for AstPrinter {
             }
         }
 
-        str += ")\n    (";
+        if !stmt.body.is_empty() {
+            str += ")\n    ";
+        } else {
+            str += ")    ";
+        }
 
         self.depth += 1;
         for stmt in &stmt.body {
@@ -201,8 +238,8 @@ impl stmt::Visitor<String, ()> for AstPrinter {
         self.depth -= 1;
 
         str += "\n";
-        for _ in 0..self.depth-1 {
-            str += "    "
+        for _ in 0..self.depth {
+            str += "    ";
         }
         str += ")";
 
@@ -224,14 +261,42 @@ impl stmt::Visitor<String, ()> for AstPrinter {
     fn break_stmt(&mut self, _stmt: &stmt::Break) -> Result<String, ()> {
         Ok(self.parenthesize(String::from("BREAK"), &[]))
     }
+
+    fn class_decl(&mut self, stmt: &stmt::ClassDecl) -> Result<String, ()> {
+        let mut str = String::from("(CLASS ");
+        str += &stmt.name.kind.as_string();
+        str += "\n";
+        self.depth += 1;
+        for method in &stmt.methods {
+            for _ in 0..self.depth {
+                str += "    ";
+            }
+
+            str += &self.function(method)?;
+
+            str += "\n";
+        }
+
+        for _ in 0..self.depth - 1 {
+            str += "    ";
+        }
+
+        self.depth -= 1;
+
+        str += ")";
+
+        Ok(str)
+    }
 }
 
+#[allow(dead_code)]
 impl AstPrinter {
     pub fn print(&mut self, stmts: &Vec<Stmt>) -> String {
         let mut str = "".to_string();
 
         for stmt in stmts {
             str += stmt.accept(self).unwrap().as_str();
+            str += "\n";
             str += "\n";
         }
 

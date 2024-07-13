@@ -1,15 +1,16 @@
 mod ast_printer;
 mod callable;
+mod class;
 mod error;
 mod expr;
 mod interpreter;
 mod lexer;
 mod object;
 mod parser;
+mod resolver;
 mod stmt;
 mod token;
 mod token_kind;
-mod resolver;
 
 use core::panic;
 use std::env::args;
@@ -20,8 +21,10 @@ use std::process::exit;
 use crate::lexer::Lexer;
 use crate::token::Token;
 
-use ast_printer::AstPrinter;
-use error::LoxError::{Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime};
+// use ast_printer::AstPrinter;
+use error::LoxError::{
+    Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime,
+};
 use error::LoxResult;
 
 use interpreter::Interpreter;
@@ -41,7 +44,7 @@ fn run(source: &str, interpreter: &mut Interpreter) -> LoxResult<()> {
         Err(e) => return Err(ParserError(e)),
     };
 
-    println!("{}", AstPrinter::new().print(&stmts));
+    // println!("{}", AstPrinter::new().print(&stmts));
 
     let mut resolver = Resolver::new(interpreter);
     match resolver.resolve_stmts(&stmts) {

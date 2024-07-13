@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::callable::{Callable, LambdaFunction, UserFunction};
+use crate::class::Class;
 use crate::expr::{self, Expr};
 use crate::object::Object;
 use crate::stmt::{self, Stmt};
@@ -13,10 +14,12 @@ use crate::token_kind::TokenKind;
 
 pub enum ErrorKind {
     UndefinedVariable,
+    UndefinedProperty,
     InvalidType,
     IncorrectArgCount,
+    TypeHasNoProperties,
 
-    Return(Object),
+    Return(Rc<Object>),
     Break,
 }
 
@@ -29,6 +32,13 @@ impl Error {
     pub fn undefined_variable(line: usize) -> Self {
         Self {
             kind: ErrorKind::UndefinedVariable,
+            line,
+        }
+    }
+
+    pub fn undefined_property(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::UndefinedProperty,
             line,
         }
     }
@@ -46,9 +56,17 @@ impl Error {
             line,
         }
     }
-    pub fn _return(obj: Object) -> Self {
+
+    pub fn type_has_no_properties(line: usize) -> Self {
         Self {
-            kind: ErrorKind::Return(obj),
+            kind: ErrorKind::TypeHasNoProperties,
+            line,
+        }
+    }
+
+    pub fn _return(obj: Rc<Object>) -> Self {
+        Self {
+            kind: ErrorKind::Return(Rc::clone(&obj)),
             line: 0,
         }
     }
@@ -68,6 +86,8 @@ impl fmt::Display for Error {
             ErrorKind::IncorrectArgCount => write!(f, "IncorrectArgCount"),
             ErrorKind::InvalidType => write!(f, "InvalidType"),
             ErrorKind::UndefinedVariable => write!(f, "UndefinedVariable"),
+            ErrorKind::UndefinedProperty => write!(f, "UndefinedProperty"),
+            ErrorKind::TypeHasNoProperties => write!(f, "TypeHasNoProperties"),
         }
     }
 }
@@ -76,7 +96,7 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Debug, Clone)]
 pub struct Env {
-    pub values: RefCell<HashMap<String, Object>>,
+    pub values: RefCell<HashMap<String, Rc<Object>>>,
 }
 
 impl Env {
@@ -87,17 +107,17 @@ impl Env {
     }
 }
 
-fn native_clock_fn(_interpreter: &Interpreter, _args: Vec<Object>) -> Result<Object> {
+fn native_clock_fn(_interpreter: &Interpreter, _args: Vec<Rc<Object>>) -> Result<Rc<Object>> {
     let time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Did we travel back in time?")
         .as_secs() as f64;
-    Ok(Object::Number(time))
+    Ok(Rc::new(Object::Number(time)))
 }
 
-fn native_println_fn(_interpreter: &Interpreter, args: Vec<Object>) -> Result<Object> {
+fn native_println_fn(_interpreter: &Interpreter, args: Vec<Rc<Object>>) -> Result<Rc<Object>> {
     for arg in args {
-        match arg {
+        match arg.as_ref() {
             Object::Str(s) => print!("{s}"),
             _ => print!("{arg}"),
         }
@@ -105,14 +125,13 @@ fn native_println_fn(_interpreter: &Interpreter, args: Vec<Object>) -> Result<Ob
 
     println!();
 
-    Ok(Object::Nil)
+    Ok(Rc::new(Object::Nil))
 }
 
 pub struct Interpreter {
     envs: Vec<Rc<Env>>,
     locals: HashMap<Rc<Expr>, usize>,
 }
-
 
 impl Interpreter {
     pub fn new() -> Self {
@@ -123,20 +142,20 @@ impl Interpreter {
 
         this.define(
             String::from("clock"),
-            Object::Func(Callable::NativeFn(
+            Rc::new(Object::Func(Callable::Native(
                 String::from("clock"),
                 0,
                 native_clock_fn,
-            )),
+            ))),
         );
 
         this.define(
             String::from("println"),
-            Object::Func(Callable::NativeFn(
+            Rc::new(Object::Func(Callable::Native(
                 String::from("println"),
                 1,
                 native_println_fn,
-            )),
+            ))),
         );
 
         this
@@ -156,18 +175,29 @@ impl Interpreter {
 
     pub fn resolve(&mut self, expr: Rc<Expr>, depth: usize) {
         self.locals.insert(expr, depth);
-    } 
-
-    fn lookup_variable(&self, expr: Rc<Expr>, name: &Token) -> Result<Object> {
-        let var_name = &name.kind.as_string();
-        match self.locals.get(&expr) {
-            Some(dist) => self.env_at_distance(*dist).values.borrow().get(var_name).ok_or(Error::undefined_variable(name.line)).cloned(),
-            None => self.global_env().values.borrow().get(var_name).ok_or(Error::undefined_variable(name.line)).cloned(),
-        }
-        
     }
 
-    fn eval(&mut self, expr: Rc<Expr>) -> Result<Object> {
+    fn lookup_variable(&self, expr: Rc<Expr>, name: &Token) -> Result<Rc<Object>> {
+        let var_name = &name.kind.as_string();
+        match self.locals.get(&expr) {
+            Some(dist) => self
+                .env_at_distance(*dist)
+                .values
+                .borrow()
+                .get(var_name)
+                .ok_or(Error::undefined_variable(name.line))
+                .cloned(),
+            None => self
+                .global_env()
+                .values
+                .borrow()
+                .get(var_name)
+                .ok_or(Error::undefined_variable(name.line))
+                .cloned(),
+        }
+    }
+
+    fn eval(&mut self, expr: Rc<Expr>) -> Result<Rc<Object>> {
         expr.accept(self)
     }
 
@@ -181,11 +211,11 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn define(&mut self, name: String, obj: Object) {
+    pub fn define(&mut self, name: String, obj: Rc<Object>) {
         _ = self.env().values.borrow_mut().insert(name.clone(), obj);
     }
 
-    pub fn assign(&self, name: &String, obj: Object) -> Option<()> {
+    pub fn assign(&self, name: &String, obj: Rc<Object>) -> Option<()> {
         for env in self.envs.iter().rev() {
             if !env.values.borrow().contains_key(name) {
                 continue;
@@ -198,7 +228,8 @@ impl Interpreter {
         None
     }
 
-    pub fn fetch(&self, name: &String) -> Option<Object> {
+    #[allow(dead_code)]
+    pub fn fetch(&self, name: &String) -> Option<Rc<Object>> {
         for env in self.envs.iter().rev() {
             if !env.values.borrow().contains_key(name) {
                 continue;
@@ -249,99 +280,121 @@ impl Interpreter {
     }
 }
 
-impl expr::Visitor<Object, Error> for Interpreter {
-    fn unary(&mut self, expr: Rc<expr::Unary>) -> Result<Object> {
+impl expr::Visitor<Rc<Object>, Error> for Interpreter {
+    fn unary(&mut self, expr: Rc<expr::Unary>) -> Result<Rc<Object>> {
         let right = self.eval(Rc::clone(&expr.expr))?;
 
         match expr.op.kind {
             TokenKind::Minus => match self.check_operands(&[&right], &expr.op) {
-                Ok(()) => Ok(Object::Number(-right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Number(-right.get_number()))),
                 Err(e) => Err(e),
             },
-            TokenKind::Bang => Ok(Object::Bool(!right.is_truthy())),
+            TokenKind::Bang => Ok(Rc::new(Object::Bool(!right.is_truthy()))),
 
             _ => unreachable!(),
         }
     }
 
-    fn binary(&mut self, expr: Rc<expr::Binary>) -> Result<Object> {
+    fn binary(&mut self, expr: Rc<expr::Binary>) -> Result<Rc<Object>> {
         let left = self.eval(Rc::clone(&expr.left))?;
         let right = self.eval(Rc::clone(&expr.right))?;
 
         match expr.op.kind {
             TokenKind::Minus => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Number(left.get_number() - right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Number(
+                    left.get_number() - right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
             TokenKind::Plus => {
                 use Object::{Number, Str};
-                match (left, right) {
-                    (Number(l), Number(r)) => Ok(Object::Number(l + r)),
-                    (Str(l), Str(r)) => Ok(Object::Str(l.to_owned() + &r)),
-                    (Number(l), Str(r)) => Ok(Object::Str(format!("{l}{r}").to_string())),
-                    (Str(l), Number(r)) => Ok(Object::Str(format!("{l}{r}").to_string())),
+                match (left.as_ref(), right.as_ref()) {
+                    (Number(l), Number(r)) => Ok(Rc::new(Object::Number(l + r))),
+                    (Str(l), Str(r)) => Ok(Rc::new(Object::Str(l.to_owned() + r))),
+                    (Number(l), Str(r)) => Ok(Rc::new(Object::Str(format!("{l}{r}").to_string()))),
+                    (Str(l), Number(r)) => Ok(Rc::new(Object::Str(format!("{l}{r}").to_string()))),
                     (_, _) => Err(Error::invalid_type(expr.op.line)),
                 }
             }
             TokenKind::Slash => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Number(left.get_number() / right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Number(
+                    left.get_number() / right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
             TokenKind::Star => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Number(left.get_number() * right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Number(
+                    left.get_number() * right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
 
             TokenKind::Gt => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Bool(left.get_number() > right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Bool(
+                    left.get_number() > right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
             TokenKind::GtEq => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Bool(left.get_number() >= right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Bool(
+                    left.get_number() >= right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
             TokenKind::Lt => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Bool(left.get_number() < right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Bool(
+                    left.get_number() < right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
             TokenKind::LtEq => match self.check_operands(&[&left, &right], &expr.op) {
-                Ok(()) => Ok(Object::Bool(left.get_number() <= right.get_number())),
+                Ok(()) => Ok(Rc::new(Object::Bool(
+                    left.get_number() <= right.get_number(),
+                ))),
                 Err(e) => Err(e),
             },
 
-            TokenKind::BangEq => Ok(Object::Bool(left.equals(&right))),
-            TokenKind::EqEq => Ok(Object::Bool(left.equals(&right))),
+            TokenKind::BangEq => Ok(Rc::new(Object::Bool(left.equals(&right)))),
+            TokenKind::EqEq => Ok(Rc::new(Object::Bool(left.equals(&right)))),
 
             _ => unreachable!(),
         }
     }
 
-    fn literal(&mut self, expr: Rc<expr::Literal>) -> Result<Object> {
-        Ok(expr.lit.clone())
+    fn literal(&mut self, expr: Rc<expr::Literal>) -> Result<Rc<Object>> {
+        Ok(Rc::clone(&expr.lit))
     }
 
-    fn grouping(&mut self, expr: Rc<expr::Grouping>) -> Result<Object> {
+    fn grouping(&mut self, expr: Rc<expr::Grouping>) -> Result<Rc<Object>> {
         self.eval(Rc::clone(&expr.expr))
     }
 
-    fn var(&mut self, expr: Rc<expr::Var>) -> std::result::Result<Object, Error> {
+    fn var(&mut self, expr: Rc<expr::Var>) -> std::result::Result<Rc<Object>, Error> {
         self.lookup_variable(Rc::new(Expr::Var(Rc::clone(&expr))), &expr.name)
     }
 
-    fn assignment(&mut self, expr: Rc<expr::Assignment>) -> std::result::Result<Object, Error> {
+    fn assignment(&mut self, expr: Rc<expr::Assignment>) -> std::result::Result<Rc<Object>, Error> {
         let value = self.eval(Rc::clone(&expr.value))?;
         let var_name = expr.name.kind.as_string();
         let expr = Rc::new(Expr::Assignment(Rc::clone(&expr)));
 
         _ = match self.locals.get(&expr) {
-            Some(dist) => self.env_at_distance(*dist).values.borrow_mut().insert(var_name, value.clone()),
-            None => self.global_env().values.borrow_mut().insert(var_name, value.clone()),
+            Some(dist) => self
+                .env_at_distance(*dist)
+                .values
+                .borrow_mut()
+                .insert(var_name, value.clone()),
+            None => self
+                .global_env()
+                .values
+                .borrow_mut()
+                .insert(var_name, value.clone()),
         };
 
         Ok(value)
     }
 
-    fn logical(&mut self, expr: Rc<expr::Logical>) -> std::result::Result<Object, Error> {
+    fn logical(&mut self, expr: Rc<expr::Logical>) -> std::result::Result<Rc<Object>, Error> {
         let left = self.eval(Rc::clone(&expr.left))?;
 
         if matches!(expr.op.kind, TokenKind::Or) && left.is_truthy() {
@@ -355,19 +408,19 @@ impl expr::Visitor<Object, Error> for Interpreter {
         self.eval(Rc::clone(&expr.right))
     }
 
-    fn call(&mut self, expr: Rc<expr::Call>) -> std::result::Result<Object, Error> {
-        let mut callee = self.eval(Rc::clone(&expr.callee))?;
+    fn call(&mut self, expr: Rc<expr::Call>) -> std::result::Result<Rc<Object>, Error> {
+        let callee = self.eval(Rc::clone(&expr.callee))?;
 
         let mut args = vec![];
         for arg in &expr.args {
             args.push(self.eval(Rc::clone(arg))?);
         }
 
-        if !matches!(callee, Object::Func(_)) {
+        if !matches!(callee.as_ref(), Object::Func(_)) {
             return Err(Error::invalid_type(expr.paren.line));
         }
 
-        let func: &mut Callable = callee.get_func();
+        let func = callee.get_func();
 
         if func.arity() as usize != args.len() {
             return Err(Error::incorrect_arg_count(expr.paren.line));
@@ -376,9 +429,37 @@ impl expr::Visitor<Object, Error> for Interpreter {
         func.call(self, args)
     }
 
-    fn lambda(&mut self, expr: Rc<expr::Lambda>) -> std::result::Result<Object, Error> {
-        let lambda = Callable::LambdaFn(LambdaFunction::new(Rc::clone(&expr), self.env()));
-        Ok(Object::Func(lambda))
+    fn lambda(&mut self, expr: Rc<expr::Lambda>) -> std::result::Result<Rc<Object>, Error> {
+        let lambda = Callable::Lambda(LambdaFunction::new(Rc::clone(&expr), vec![self.env()]));
+        Ok(Rc::new(Object::Func(lambda)))
+    }
+
+    fn get(&mut self, expr: Rc<expr::Get>) -> std::result::Result<Rc<Object>, Error> {
+        let object = self.eval(Rc::clone(&expr.object))?;
+        match object.as_ref() {
+            Object::Instance(i) => match i.borrow().get(i, &expr.name) {
+                Some(obj) => Ok(obj),
+                None => Err(Error::undefined_property(expr.name.line)),
+            },
+            _ => Err(Error::type_has_no_properties(expr.name.line)),
+        }
+    }
+
+    fn set(&mut self, expr: Rc<expr::Set>) -> std::result::Result<Rc<Object>, Error> {
+        let obj = self.eval(Rc::clone(&expr.object))?;
+
+        match obj.as_ref() {
+            Object::Instance(i) => {
+                let value = self.eval(Rc::clone(&expr.value))?;
+                i.borrow_mut().set(&expr.name, value.clone());
+                Ok(value)
+            }
+            _ => Err(Error::type_has_no_properties(expr.name.line)),
+        }
+    }
+
+    fn this(&mut self, expr: Rc<expr::This>) -> std::result::Result<Rc<Object>, Error> {
+        self.lookup_variable(Rc::new(Expr::This(Rc::clone(&expr))), &expr.keyword)
     }
 }
 
@@ -424,11 +505,11 @@ impl stmt::Visitor<(), Error> for Interpreter {
     fn while_stmt(&mut self, stmt: &stmt::While) -> std::result::Result<(), Error> {
         while self.eval(Rc::clone(&stmt.condition))?.is_truthy() {
             match self.execute(&stmt.statement) {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(e) => match &e.kind {
                     ErrorKind::Break => break,
                     _ => return Err(e),
-                }
+                },
             }
         }
 
@@ -436,19 +517,39 @@ impl stmt::Visitor<(), Error> for Interpreter {
     }
 
     fn function(&mut self, stmt: &stmt::Function) -> std::result::Result<(), Error> {
-        let func = Callable::UserFn(UserFunction::new(Rc::new(stmt.clone()), self.env()));
-        self.define(func.name(), Object::Func(func));
+        let func = Callable::User(UserFunction::new(Rc::new(stmt.clone()), vec![self.env()], false));
+        self.define(func.name(), Rc::new(Object::Func(func)));
         Ok(())
     }
 
     fn return_stmt(&mut self, stmt: &stmt::Return) -> std::result::Result<(), Error> {
-        Err(Error::_return(match &stmt.value {
-            Some(val) => self.eval(Rc::clone(val))?,
-            None => Object::Nil,
+        Err(Error::_return(match &stmt.value.as_ref() {
+            Some(val) => Rc::clone(&self.eval(Rc::clone(val))?),
+            None => Rc::new(Object::Nil),
         }))
     }
 
     fn break_stmt(&mut self, _stmt: &stmt::Break) -> std::result::Result<(), Error> {
         Err(Error::_break())
+    }
+
+    fn class_decl(&mut self, stmt: &stmt::ClassDecl) -> std::result::Result<(), Error> {
+        self.define(stmt.name.kind.as_string(), Rc::new(Object::Nil));
+
+        let mut methods: HashMap<String, UserFunction> = HashMap::new();
+        for method in &stmt.methods {
+            let function = UserFunction::new(
+                Rc::new(method.clone()), 
+                vec![self.env().clone()], 
+                method.name.kind.as_string() == "init");
+            methods.insert(method.name.kind.as_string(), function);
+        }
+
+        let class = Class::new(stmt.name.clone(), methods);
+        self.assign(
+            &stmt.name.kind.as_string(),
+            Rc::new(Object::Func(Callable::Class(class))),
+        );
+        Ok(())
     }
 }

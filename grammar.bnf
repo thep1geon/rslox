@@ -1,8 +1,11 @@
 program     -> declaration* EOF ;
 
-declaration -> fun_decl
+declaration -> class_decl
+             | fun_decl
              | var_decl
              | statement ;
+
+class_decl  -> "class" IDENTIFIER "{" function* "}" ;
 
 fun_decl    -> "fun" function ;
 
@@ -38,7 +41,7 @@ print_stmt  -> "print" expression ";" ;
 
 expression  -> assignment ;
 
-assignment  -> IDENTIFIER "=" assignment
+assignment  -> ( call "." )? IDENTIFIER "=" assignment
              | logic_or ;
 
 logic_or    -> logic_and ( "or" logic_and )* ;
@@ -56,7 +59,7 @@ factor      -> unary ( ( "/" | "*" ) unary )* ;
 unary       -> ( "!" | "-" ) unary 
              | call ;
 
-call        -> primary ( "(" arguments? ")" )* ;
+call        -> primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
 
 arguments   -> expression ( "," expression )* ;
 
