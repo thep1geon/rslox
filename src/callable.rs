@@ -4,8 +4,8 @@ use crate::interpreter::{self, Env, Interpreter};
 use crate::object::Object;
 use crate::stmt::Function;
 
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::result::Result;
 
 pub type NativeFn =
@@ -73,10 +73,10 @@ impl UserFunction {
         interpreter: &mut Interpreter,
         args: Vec<Rc<Object>>,
     ) -> Result<Rc<Object>, interpreter::Error> {
-        for closure in &self.closures {
+        interpreter.enter_scope();
+        for closure in self.closures.iter().rev() {
             interpreter.push_scope(Rc::clone(closure));
         }
-        interpreter.enter_scope();
 
         for (i, arg) in args.iter().enumerate() {
             interpreter.define(
@@ -88,14 +88,14 @@ impl UserFunction {
         let ret = match interpreter.interpret(&self.decl.body) {
             Ok(()) => {
                 if self.is_initializer {
-                    return Ok(Rc::clone(self
-                        .closures
-                        .last()
-                        .unwrap()
-                        .values
-                        .borrow()
-                        .get(&"this".to_owned())
-                        .unwrap()
+                    return Ok(Rc::clone(
+                        self.closures
+                            .last()
+                            .unwrap()
+                            .values
+                            .borrow()
+                            .get(&"this".to_owned())
+                            .unwrap(),
                     ));
                 }
 
@@ -104,27 +104,27 @@ impl UserFunction {
             Err(e) => match e.kind {
                 interpreter::ErrorKind::Return(val) => {
                     if self.is_initializer {
-                        return Ok(Rc::clone(self
-                            .closures
-                            .last()
-                            .unwrap()
-                            .values
-                            .borrow()
-                            .get(&"this".to_owned())
-                            .unwrap()
+                        return Ok(Rc::clone(
+                            self.closures
+                                .last()
+                                .unwrap()
+                                .values
+                                .borrow()
+                                .get(&"this".to_owned())
+                                .unwrap(),
                         ));
                     }
 
                     Ok(val)
-                },
+                }
                 _ => Err(e),
             },
         };
 
+        interpreter.leave_scope();
         for _ in self.closures.iter().rev() {
             interpreter.leave_scope();
         }
-        interpreter.leave_scope();
 
         ret
     }

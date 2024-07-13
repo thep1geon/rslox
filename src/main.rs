@@ -21,7 +21,7 @@ use std::process::exit;
 use crate::lexer::Lexer;
 use crate::token::Token;
 
-// use ast_printer::AstPrinter;
+use ast_printer::AstPrinter;
 use error::LoxError::{
     Lexer as LexerError, Parser as ParserError, Resolver as ResolverError, Runtime,
 };
@@ -44,7 +44,7 @@ fn run(source: &str, interpreter: &mut Interpreter) -> LoxResult<()> {
         Err(e) => return Err(ParserError(e)),
     };
 
-    // println!("{}", AstPrinter::new().print(&stmts));
+    println!("{}", AstPrinter::new().print(&stmts));
 
     let mut resolver = Resolver::new(interpreter);
     match resolver.resolve_stmts(&stmts) {

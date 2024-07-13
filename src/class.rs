@@ -17,8 +17,16 @@ pub struct Class {
 }
 
 impl Class {
-    pub fn new(name: Token, superclass: Option<Rc<Class>>, methods: HashMap<String, UserFunction>) -> Self {
-        Self { name, superclass, methods }
+    pub fn new(
+        name: Token,
+        superclass: Option<Rc<Class>>,
+        methods: HashMap<String, UserFunction>,
+    ) -> Self {
+        Self {
+            name,
+            superclass,
+            methods,
+        }
     }
 
     pub fn arity(&self) -> u8 {
@@ -37,7 +45,7 @@ impl Class {
         let instance = Rc::new(RefCell::new(Instance::new(self.clone())));
 
         if let Some(init) = self.find_method(&String::from("init")) {
-            _ = init.bind(Rc::clone(&instance)).call(interpreter, args);
+            _ = init.bind(Rc::clone(&instance)).call(interpreter, args)?;
         }
 
         Ok(Rc::new(Object::Instance(instance)))
@@ -50,7 +58,7 @@ impl Class {
 
         match &self.superclass {
             Some(s) => s.find_method(name),
-            None => None
+            None => None,
         }
     }
 }

@@ -472,25 +472,41 @@ impl expr::Visitor<Rc<Object>, Error> for Interpreter {
     }
 
     fn superclass(&mut self, expr: Rc<expr::Super>) -> std::result::Result<Rc<Object>, Error> {
-        let dist = *self.locals.get(&Rc::new(Expr::Super(Rc::clone(&expr)))).unwrap();
+        let dist = *self
+            .locals
+            .get(&Rc::new(Expr::Super(Rc::clone(&expr))))
+            .unwrap();
 
-        let superclass = match self.env_at_distance(dist).values.borrow().get(&"super".to_owned()).unwrap().as_ref() {
+        let superclass = match self
+            .env_at_distance(dist)
+            .values
+            .borrow()
+            .get(&"super".to_owned())
+            .unwrap()
+            .as_ref()
+        {
             Object::Func(Callable::Class(c)) => c.clone(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
-        let instance = match self.env_at_distance(dist-1).values.borrow().get(&"this".to_owned()).unwrap().as_ref() {
+        let instance = match self
+            .env_at_distance(dist - 1)
+            .values
+            .borrow()
+            .get(&"this".to_owned())
+            .unwrap()
+            .as_ref()
+        {
             Object::Instance(i) => i.clone(),
-            _ => unreachable!()
+            _ => unreachable!(),
         };
-        
+
         let method = match superclass.find_method(&expr.method.kind.as_string()) {
             Some(m) => m,
             None => return Err(Error::undefined_property(expr.method.line)),
         };
 
-        Ok(Rc::new(Object::Func(
-            Callable::User(method.bind(instance)))))
+        Ok(Rc::new(Object::Func(Callable::User(method.bind(instance)))))
     }
 }
 
@@ -548,7 +564,11 @@ impl stmt::Visitor<(), Error> for Interpreter {
     }
 
     fn function(&mut self, stmt: &stmt::Function) -> std::result::Result<(), Error> {
-        let func = Callable::User(UserFunction::new(Rc::new(stmt.clone()), vec![self.env()], false));
+        let func = Callable::User(UserFunction::new(
+            Rc::new(stmt.clone()),
+            vec![self.env()],
+            false,
+        ));
         self.define(func.name(), Rc::new(Object::Func(func)));
         Ok(())
     }
@@ -573,9 +593,7 @@ impl stmt::Visitor<(), Error> for Interpreter {
         let superclass = match superclass_obj.as_ref() {
             Object::Nil => None,
             Object::Func(Callable::Class(c)) => Some(Rc::new(c.clone())),
-            _ => {
-                return Err(Error::super_class_not_class(stmt.name.line))
-            },
+            _ => return Err(Error::super_class_not_class(stmt.name.line)),
         };
 
         self.define(stmt.name.kind.as_string(), Rc::new(Object::Nil));
@@ -588,14 +606,15 @@ impl stmt::Visitor<(), Error> for Interpreter {
         let mut methods: HashMap<String, UserFunction> = HashMap::new();
         for method in &stmt.methods {
             let function = UserFunction::new(
-                Rc::new(method.clone()), 
-                vec![self.env().clone()], 
-                method.name.kind.as_string() == "init");
+                Rc::new(method.clone()),
+                vec![self.env().clone()],
+                method.name.kind.as_string() == "init",
+            );
             methods.insert(method.name.kind.as_string(), function);
         }
 
         let class = Class::new(stmt.name.clone(), superclass, methods);
-        
+
         if stmt.superclass.is_some() {
             self.leave_scope();
         }

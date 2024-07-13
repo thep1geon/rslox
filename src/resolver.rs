@@ -281,10 +281,12 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
         match &stmt.value {
             Some(val) => {
                 if self.current_func == FunctionType::Initializer {
-                    return Err(Error::cannot_return_from_init_function(stmt.keyword.clone()));
+                    return Err(Error::cannot_return_from_init_function(
+                        stmt.keyword.clone(),
+                    ));
                 }
                 self.resolve_expr(val)
-            },
+            }
             None => Ok(()),
         }
     }
@@ -307,8 +309,10 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
 
         if let Some(superclass) = &stmt.superclass {
             if stmt.name.kind.as_string() == superclass.name.kind.as_string() {
-                return Err(Error::class_cannot_inherit_from_itself(superclass.name.clone()))
-            } 
+                return Err(Error::class_cannot_inherit_from_itself(
+                    superclass.name.clone(),
+                ));
+            }
 
             self.current_class = ClassType::Subclass;
             self.resolve_expr(&Expr::Var(Rc::clone(superclass)))?;
@@ -316,7 +320,10 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
 
         if stmt.superclass.is_some() {
             self.begin_scope();
-            self.scopes.last_mut().unwrap().insert("super".to_owned(), true);
+            self.scopes
+                .last_mut()
+                .unwrap()
+                .insert("super".to_owned(), true);
         }
 
         self.begin_scope();

@@ -166,6 +166,10 @@ pub struct ClassDecl {
 
 impl ClassDecl {
     pub fn new(name: Token, superclass: Option<Rc<expr::Var>>, methods: Vec<Function>) -> Self {
-        Self { name, superclass, methods }
+        Self {
+            name,
+            superclass,
+            methods,
+        }
     }
 }
