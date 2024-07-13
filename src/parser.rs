@@ -2,7 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::expr::{
-    Assignment, Binary, Call, Expr, Get, Grouping, Lambda, Literal, Logical, Set, This, Unary, Var,
+    Assignment, Binary, Call, Expr, Get, Grouping, Lambda, Literal, Logical, Set, Super, This, Unary, Var
 };
 use crate::object::Object;
 use crate::stmt::{
@@ -182,6 +182,22 @@ impl Parser {
 
         let name = self.advance().clone();
 
+        let mut superclass = None;
+        if self.matches(&[TokenKind::Lt]) {
+            superclass = if !matches!(self.peek().kind, TokenKind::Ident(_)) {
+                self.error(
+                    format!(
+                        "Expected class name but got '{}' instead",
+                        self.peek().kind.as_string()
+                    )
+                        .as_str(),
+                );
+                return Err(Error::unexpected_token(self.peek().clone()));
+            } else {
+                Some(Var::new(self.advance().clone()))
+            };
+        }
+        
         self.expect(&TokenKind::LBrace)?;
 
         let mut methods: Vec<stmt::Function> = vec![];
@@ -194,7 +210,7 @@ impl Parser {
 
         self.expect(&TokenKind::RBrace)?;
 
-        Ok(Stmt::ClassDecl(ClassDecl::new(name, methods)))
+        Ok(Stmt::ClassDecl(ClassDecl::new(name, superclass, methods)))
     }
 
     fn function_declaration(&mut self) -> Result<Stmt> {
@@ -627,9 +643,27 @@ impl Parser {
                 self.expect(&TokenKind::RParen)?;
                 Ok(Rc::new(Expr::Grouping(Grouping::new(expr))))
             }
-            TokenKind::This => Ok(Rc::new(Expr::This(Rc::new(This::new(
+            TokenKind::This => Ok(Rc::new(Expr::This(This::new(
                 self.prev().unwrap().clone(),
-            ))))),
+            )))),
+            TokenKind::Super => {
+                let keyword = self.prev().unwrap().clone();
+                self.expect(&TokenKind::Dot)?;
+                if !matches!(self.peek().kind, TokenKind::Ident(_)) {
+                    self.error(
+                        format!(
+                            "Expected: IDENTIFIER but got '{}' instead",
+                            self.peek().kind.as_string()
+                        )
+                        .as_str(),
+                    );
+                    return Err(Error::unexpected_token(self.peek().clone()));
+                }
+
+                let method = self.advance().clone();
+
+                Ok(Rc::new(Expr::Super(Super::new(keyword, method))))
+            }
             _ => {
                 self.error("Unknown Token");
                 Err(Error::unexpected_token(self.peek().clone()))

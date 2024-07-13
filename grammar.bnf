@@ -5,7 +5,8 @@ declaration -> class_decl
              | var_decl
              | statement ;
 
-class_decl  -> "class" IDENTIFIER "{" function* "}" ;
+class_decl  -> "class" IDENTIFIER ( "<" IDENTIFIER )?
+               "{" function* "}" ;
 
 fun_decl    -> "fun" function ;
 
@@ -67,5 +68,6 @@ primary     -> NUMBER | STRING | IDENTIFIER
              | "true" | "false" | "nil"
              | lambda
              | "(" expression ")" ;
+             | "super" "." IDENTIFIER ;
 
 lambda      -> "fun" "(" parameters? ")" statement

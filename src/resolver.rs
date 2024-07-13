@@ -12,7 +12,9 @@ pub enum ErrorKind {
     LocalVariableInitSelf,
     VariableAlreadyDefined,
     CannotReturnFromTopLevel,
+    SuperUsedOutsideSubClass,
     CannotReturnFromInitFunction,
+    ClassCannotInherirFromItself,
 }
 
 pub struct Error {
@@ -55,6 +57,20 @@ impl Error {
             tok,
         }
     }
+
+    pub fn class_cannot_inherit_from_itself(tok: Token) -> Self {
+        Self {
+            kind: ErrorKind::ClassCannotInherirFromItself,
+            tok,
+        }
+    }
+
+    pub fn super_used_outside_sub_class(tok: Token) -> Self {
+        Self {
+            kind: ErrorKind::SuperUsedOutsideSubClass,
+            tok,
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -64,7 +80,9 @@ impl fmt::Display for Error {
             ErrorKind::LocalVariableInitSelf => write!(f, "LocalVariableInitSelf"),
             ErrorKind::VariableAlreadyDefined => write!(f, "VariableAlreadyDefined"),
             ErrorKind::CannotReturnFromTopLevel => write!(f, "CannotReturnFromTopLevel"),
+            ErrorKind::SuperUsedOutsideSubClass => write!(f, "SuperUsedOutsideSubClass"),
             ErrorKind::CannotReturnFromInitFunction => write!(f, "CannotReturnFromInitFunction"),
+            ErrorKind::ClassCannotInherirFromItself => write!(f, "ClassCannotInherirFromItself"),
         }
     }
 }
@@ -82,6 +100,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 pub struct Resolver<'a> {
@@ -286,6 +305,20 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
         self.declare(&stmt.name)?;
         self.define(&stmt.name);
 
+        if let Some(superclass) = &stmt.superclass {
+            if stmt.name.kind.as_string() == superclass.name.kind.as_string() {
+                return Err(Error::class_cannot_inherit_from_itself(superclass.name.clone()))
+            } 
+
+            self.current_class = ClassType::Subclass;
+            self.resolve_expr(&Expr::Var(Rc::clone(superclass)))?;
+        }
+
+        if stmt.superclass.is_some() {
+            self.begin_scope();
+            self.scopes.last_mut().unwrap().insert("super".to_owned(), true);
+        }
+
         self.begin_scope();
         self.scopes
             .last_mut()
@@ -303,6 +336,10 @@ impl<'a> stmt::Visitor<(), Error> for Resolver<'a> {
         }
 
         self.end_scope();
+
+        if stmt.superclass.is_some() {
+            self.end_scope();
+        }
 
         self.current_class = prev_class;
         Ok(())
@@ -381,5 +418,13 @@ impl<'a> expr::Visitor<(), Error> for Resolver<'a> {
         }
 
         self.resolve_local(Rc::new(Expr::This(Rc::clone(&expr))), &expr.keyword)
+    }
+
+    fn superclass(&mut self, expr: Rc<expr::Super>) -> Result<(), Error> {
+        if self.current_class != ClassType::Subclass {
+            return Err(Error::super_used_outside_sub_class(expr.keyword.clone()));
+        }
+
+        self.resolve_local(Rc::new(Expr::Super(Rc::clone(&expr))), &expr.keyword)
     }
 }

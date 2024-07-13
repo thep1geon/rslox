@@ -119,6 +119,10 @@ impl expr::Visitor<String, ()> for AstPrinter {
     fn this(&mut self, _: Rc<expr::This>) -> Result<String, ()> {
         Ok(self.parenthesize("THIS".to_string(), &[]))
     }
+
+    fn superclass(&mut self, _: Rc<expr::Super>) -> Result<String, ()> {
+        Ok(self.parenthesize("SUPER".to_string(), &[]))
+    }
 }
 
 impl stmt::Visitor<String, ()> for AstPrinter {

@@ -1,4 +1,4 @@
-use crate::expr::Expr;
+use crate::expr::{self, Expr};
 use crate::token::Token;
 use std::rc::Rc;
 
@@ -160,11 +160,12 @@ impl Break {
 #[derive(Debug, Clone)]
 pub struct ClassDecl {
     pub name: Token,
+    pub superclass: Option<Rc<expr::Var>>,
     pub methods: Vec<Function>,
 }
 
 impl ClassDecl {
-    pub fn new(name: Token, methods: Vec<Function>) -> Self {
-        Self { name, methods }
+    pub fn new(name: Token, superclass: Option<Rc<expr::Var>>, methods: Vec<Function>) -> Self {
+        Self { name, superclass, methods }
     }
 }

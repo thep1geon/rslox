@@ -13,10 +13,11 @@ use crate::token::Token;
 use crate::token_kind::TokenKind;
 
 pub enum ErrorKind {
+    InvalidType,
     UndefinedVariable,
     UndefinedProperty,
-    InvalidType,
     IncorrectArgCount,
+    SuperClassNotClass,
     TypeHasNoProperties,
 
     Return(Rc<Object>),
@@ -64,6 +65,13 @@ impl Error {
         }
     }
 
+    pub fn super_class_not_class(line: usize) -> Self {
+        Self {
+            kind: ErrorKind::SuperClassNotClass,
+            line,
+        }
+    }
+
     pub fn _return(obj: Rc<Object>) -> Self {
         Self {
             kind: ErrorKind::Return(Rc::clone(&obj)),
@@ -83,10 +91,11 @@ impl fmt::Display for Error {
         match self.kind {
             ErrorKind::Return(_) => write!(f, "Return"),
             ErrorKind::Break => write!(f, "Break"),
-            ErrorKind::IncorrectArgCount => write!(f, "IncorrectArgCount"),
             ErrorKind::InvalidType => write!(f, "InvalidType"),
             ErrorKind::UndefinedVariable => write!(f, "UndefinedVariable"),
+            ErrorKind::IncorrectArgCount => write!(f, "IncorrectArgCount"),
             ErrorKind::UndefinedProperty => write!(f, "UndefinedProperty"),
+            ErrorKind::SuperClassNotClass => write!(f, "SuperClassNotClass"),
             ErrorKind::TypeHasNoProperties => write!(f, "TypeHasNoProperties"),
         }
     }
@@ -461,6 +470,28 @@ impl expr::Visitor<Rc<Object>, Error> for Interpreter {
     fn this(&mut self, expr: Rc<expr::This>) -> std::result::Result<Rc<Object>, Error> {
         self.lookup_variable(Rc::new(Expr::This(Rc::clone(&expr))), &expr.keyword)
     }
+
+    fn superclass(&mut self, expr: Rc<expr::Super>) -> std::result::Result<Rc<Object>, Error> {
+        let dist = *self.locals.get(&Rc::new(Expr::Super(Rc::clone(&expr)))).unwrap();
+
+        let superclass = match self.env_at_distance(dist).values.borrow().get(&"super".to_owned()).unwrap().as_ref() {
+            Object::Func(Callable::Class(c)) => c.clone(),
+            _ => unreachable!()
+        };
+
+        let instance = match self.env_at_distance(dist-1).values.borrow().get(&"this".to_owned()).unwrap().as_ref() {
+            Object::Instance(i) => i.clone(),
+            _ => unreachable!()
+        };
+        
+        let method = match superclass.find_method(&expr.method.kind.as_string()) {
+            Some(m) => m,
+            None => return Err(Error::undefined_property(expr.method.line)),
+        };
+
+        Ok(Rc::new(Object::Func(
+            Callable::User(method.bind(instance)))))
+    }
 }
 
 impl stmt::Visitor<(), Error> for Interpreter {
@@ -534,7 +565,25 @@ impl stmt::Visitor<(), Error> for Interpreter {
     }
 
     fn class_decl(&mut self, stmt: &stmt::ClassDecl) -> std::result::Result<(), Error> {
+        let superclass_obj = match &stmt.superclass {
+            Some(s) => self.eval(Rc::new(Expr::Var(Rc::clone(s))))?,
+            None => Rc::new(Object::Nil),
+        };
+
+        let superclass = match superclass_obj.as_ref() {
+            Object::Nil => None,
+            Object::Func(Callable::Class(c)) => Some(Rc::new(c.clone())),
+            _ => {
+                return Err(Error::super_class_not_class(stmt.name.line))
+            },
+        };
+
         self.define(stmt.name.kind.as_string(), Rc::new(Object::Nil));
+
+        if stmt.superclass.is_some() {
+            self.enter_scope();
+            self.define("super".to_owned(), superclass_obj);
+        }
 
         let mut methods: HashMap<String, UserFunction> = HashMap::new();
         for method in &stmt.methods {
@@ -545,7 +594,12 @@ impl stmt::Visitor<(), Error> for Interpreter {
             methods.insert(method.name.kind.as_string(), function);
         }
 
-        let class = Class::new(stmt.name.clone(), methods);
+        let class = Class::new(stmt.name.clone(), superclass, methods);
+        
+        if stmt.superclass.is_some() {
+            self.leave_scope();
+        }
+
         self.assign(
             &stmt.name.kind.as_string(),
             Rc::new(Object::Func(Callable::Class(class))),

@@ -20,6 +20,7 @@ pub trait Visitor<T, E> {
     fn get(&mut self, expr: Rc<Get>) -> Result<T, E>;
     fn set(&mut self, expr: Rc<Set>) -> Result<T, E>;
     fn this(&mut self, expr: Rc<This>) -> Result<T, E>;
+    fn superclass(&mut self, expr: Rc<Super>) -> Result<T, E>;
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,7 @@ pub enum Expr {
     Get(Rc<Get>),
     Set(Rc<Set>),
     This(Rc<This>),
+    Super(Rc<Super>),
 }
 
 impl Expr {
@@ -53,6 +55,7 @@ impl Expr {
             Expr::Get(g) => visitor.get(Rc::clone(g)),
             Expr::Set(s) => visitor.set(Rc::clone(s)),
             Expr::This(t) => visitor.this(Rc::clone(t)),
+            Expr::Super(s) => visitor.superclass(Rc::clone(s)),
         }
     }
 }
@@ -72,6 +75,7 @@ impl PartialEq for Expr {
             (Expr::Get(a), Expr::Get(b)) => Rc::ptr_eq(a, b),
             (Expr::Set(a), Expr::Set(b)) => Rc::ptr_eq(a, b),
             (Expr::This(a), Expr::This(b)) => Rc::ptr_eq(a, b),
+            (Expr::Super(a), Expr::Super(b)) => Rc::ptr_eq(a, b),
             (_, _) => false,
         }
     }
@@ -94,6 +98,7 @@ impl Hash for Expr {
             Expr::Get(a) => ptr::hash(&**a, state),
             Expr::Set(a) => ptr::hash(&**a, state),
             Expr::This(a) => ptr::hash(&**a, state),
+            Expr::Super(a) => ptr::hash(&**a, state),
         }
     }
 }
@@ -245,7 +250,19 @@ pub struct This {
 }
 
 impl This {
-    pub fn new(keyword: Token) -> Self {
-        Self { keyword }
+    pub fn new(keyword: Token) -> Rc<Self> {
+        Rc::new(Self { keyword })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Super {
+    pub keyword: Token,
+    pub method: Token,
+}
+
+impl Super {
+    pub fn new(keyword: Token, method: Token) -> Rc<Self> {
+        Rc::new(Self { keyword, method })
     }
 }

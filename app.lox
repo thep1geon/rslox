@@ -7,29 +7,34 @@ class Node {
 
 class List {
     init() {
+        this.head = nil;
         this.len = 0;
-        this.head = Node(nil);
     }
 
     push(n) {
         var next = Node(n);
         this.len = this.len + 1;
 
-        if (this.head.data == nil) {
+        if (this.head == nil) {
             this.head = next;
             return;
         }
 
-        var curr = this.head;
-        while (curr.next != nil) {
-            curr = curr.next;
-        }
-
-        curr.next = next;
+        println("not implemented");
+        
+        return;
     }
+
+//  print_list() {
+//      var curr = this.head;
+//      while (curr != nil) {
+//          println(curr.data);
+//          curr = curr.next;
+//      }
+//  }
 }
 
 var list = List();
-println(list.head.data);
-list.push(5);
-println(list.head.data);
+println(List().push(5));
+//list.push(5);
+//list.print_list();

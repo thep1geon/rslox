@@ -11,13 +11,14 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct Class {
+    pub superclass: Option<Rc<Class>>,
     pub name: Token,
     pub methods: HashMap<String, UserFunction>,
 }
 
 impl Class {
-    pub fn new(name: Token, methods: HashMap<String, UserFunction>) -> Self {
-        Self { name, methods }
+    pub fn new(name: Token, superclass: Option<Rc<Class>>, methods: HashMap<String, UserFunction>) -> Self {
+        Self { name, superclass, methods }
     }
 
     pub fn arity(&self) -> u8 {
@@ -43,7 +44,14 @@ impl Class {
     }
 
     pub fn find_method(&self, name: &String) -> Option<UserFunction> {
-        self.methods.get(name).cloned()
+        if self.methods.contains_key(name) {
+            return self.methods.get(name).cloned();
+        }
+
+        match &self.superclass {
+            Some(s) => s.find_method(name),
+            None => None
+        }
     }
 }
 
